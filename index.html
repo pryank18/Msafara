@@ -1,304 +1,1055 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Msafara — Vendor coordination, automated</title>
+<title>Vendor Coordination — Control Room</title>
 <style>
-:root{--ink:#0B0D11;--surface:#14171F;--surface2:#1B1F2A;--line:#262B38;--text:#F2F0EA;--muted:#8890A0;--muted2:#5C6373;--instant:#FF5A36;--standard:#3D7EFF;--good:#34C77B;--warn:#FFC24B;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",system-ui,sans-serif;}
-html[data-theme="light"]{--ink:#F7F6F2;--surface:#FFFFFF;--surface2:#F0EEE8;--line:#E4E1D8;--text:#14171F;--muted:#5C6373;--muted2:#8890A0;}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--ink);color:var(--text);font-family:var(--sans);line-height:1.55;overflow-x:hidden;}
-a{color:inherit;text-decoration:none;}
-.wrap{max-width:1180px;margin:0 auto;padding:0 32px;}
-@media (max-width:720px){.wrap{padding:0 20px;}}
-nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:rgba(11,13,17,0.85);border-bottom:1px solid var(--line);}
-html[data-theme="light"] nav{background:rgba(247,246,242,0.9);}
-nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px;}
-.logo{font-weight:800;font-size:17px;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px;}
-.logo .dot{width:8px;height:8px;border-radius:2px;background:var(--instant);display:inline-block;}
-.navlinks{display:flex;gap:24px;font-size:14px;color:var(--muted);}
-.navlinks a:hover{color:var(--text);}
-.navright{display:flex;align-items:center;gap:12px;}
-.iconbtn{background:none;border:1px solid var(--line);color:var(--text);width:34px;height:34px;border-radius:7px;cursor:pointer;font-size:14px;}
-select.langsel{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:7px 8px;font-size:12.5px;}
-.navcta{background:var(--text);color:var(--ink);padding:9px 18px;border-radius:7px;font-size:13px;font-weight:700;white-space:nowrap;}
-.hamburger{display:none;background:none;border:1px solid var(--line);color:var(--text);width:34px;height:34px;border-radius:7px;font-size:16px;}
-@media (max-width:720px){.navlinks{display:none;}.hamburger{display:block;}}
-.drawer{display:none;flex-direction:column;gap:14px;padding:16px 20px 20px;border-bottom:1px solid var(--line);background:var(--surface);}
-.drawer.open{display:flex;}
-.hero{padding:80px 0 56px;position:relative;}
-.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;color:var(--instant);font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px;text-transform:uppercase;}
-h1{font-size:52px;font-weight:800;letter-spacing:-1.5px;line-height:1.08;max-width:800px;}
-h1 em{font-style:normal;color:var(--muted2);text-decoration:line-through;text-decoration-color:var(--instant);text-decoration-thickness:3px;}
-@media (max-width:720px){h1{font-size:34px;}}
-.sub{font-size:18px;color:var(--muted);max-width:560px;margin:22px 0 32px;}
-.herobtns{display:flex;gap:12px;flex-wrap:wrap;}
-.btn-primary{background:var(--instant);color:#0B0D11;padding:14px 26px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;border:none;cursor:pointer;}
-.btn-secondary{border:1px solid var(--line);color:var(--text);padding:14px 26px;border-radius:8px;font-weight:600;font-size:14px;display:inline-block;background:none;cursor:pointer;}
-.btn-secondary:hover{border-color:var(--muted);}
-.board{margin-top:60px;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,0.5);}
-.board-top{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);}
-.board-top .b1{font-family:var(--mono);font-size:12px;color:var(--muted);}
-.board-top .live{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--good);}
-.live .pulse{width:6px;height:6px;border-radius:50%;background:var(--good);animation:pulse 1.4s infinite;}
-@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
-.board-rows{height:220px;overflow:hidden;position:relative;}
-.board-rows::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 65%,var(--surface) 100%);pointer-events:none;}
-.board-track{animation:scrollUp 16s linear infinite;}
-@keyframes scrollUp{from{transform:translateY(0);}to{transform:translateY(-50%);}}
-.row{display:grid;grid-template-columns:110px 1fr 100px 110px;gap:12px;padding:11px 20px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:center;}
-.row .id{font-family:var(--mono);font-weight:700;color:var(--standard);}
-.row .who{color:var(--muted);}
-.row .amt{font-family:var(--mono);text-align:right;}
-.row .status{font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:20px;text-align:center;}
-.status.wait{background:rgba(255,194,75,0.15);color:var(--warn);}
-.status.neg{background:rgba(61,126,255,0.15);color:var(--standard);}
-.status.ok{background:rgba(52,199,123,0.15);color:var(--good);}
-.status.urg{background:rgba(255,90,54,0.15);color:var(--instant);}
-.stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface);}
-.stats .wrap{display:grid;grid-template-columns:repeat(4,1fr);}
-.stat{padding:26px 0;text-align:center;border-right:1px solid var(--line);}
-.stat:last-child{border-right:none;}
-.stat .n{font-family:var(--mono);font-size:24px;font-weight:800;}
-.stat .l{font-size:11.5px;color:var(--muted);margin-top:4px;}
-@media (max-width:720px){.stats .wrap{grid-template-columns:repeat(2,1fr);}.stat{border-bottom:1px solid var(--line);}}
-section{padding:88px 0;}
-.tag{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
-h2{font-size:34px;font-weight:800;letter-spacing:-.8px;max-width:640px;}
-.lead{color:var(--muted);font-size:16px;max-width:560px;margin-top:14px;}
-.problem-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:44px;}
-@media (max-width:720px){.problem-grid{grid-template-columns:1fr;}}
-.pcard{background:var(--surface);padding:28px;}
-.pcard .pnum{font-family:var(--mono);font-size:12px;color:var(--instant);margin-bottom:10px;}
-.pcard h3{font-size:17px;margin-bottom:8px;}
-.pcard p{font-size:14px;color:var(--muted);}
-.steps{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
-@media (max-width:900px){.steps{grid-template-columns:1fr;}}
-.step .sn{font-family:var(--mono);font-size:42px;font-weight:800;color:var(--surface2);margin-bottom:10px;}
-.step h3{font-size:17px;margin-bottom:8px;}
-.step p{font-size:14px;color:var(--muted);}
-.feat-grid{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
-@media (max-width:900px){.feat-grid{grid-template-columns:repeat(2,1fr);}}
-@media (max-width:600px){.feat-grid{grid-template-columns:1fr;}}
-.feat{background:var(--surface);padding:26px;}
-.feat .ic{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:14px;background:rgba(61,126,255,0.12);}
-.feat h4{font-size:15px;margin-bottom:6px;}
-.feat p{font-size:13px;color:var(--muted);}
-.calc{background:var(--surface);border:1px solid var(--line);border-radius:16px;margin-top:44px;overflow:hidden;}
-.calc-inner{display:grid;grid-template-columns:1fr 1fr;}
-@media (max-width:800px){.calc-inner{grid-template-columns:1fr;}}
-.calc-form{padding:36px;border-right:1px solid var(--line);}
-@media (max-width:800px){.calc-form{border-right:none;border-bottom:1px solid var(--line);}}
-.calc-result{padding:36px;display:flex;flex-direction:column;justify-content:center;}
-.field-row{margin-bottom:22px;}
-.field-row label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:10px;}
-.field-row label .v{font-family:var(--mono);color:var(--text);font-weight:700;}
-input[type=range]{width:100%;accent-color:var(--instant);}
-.rlabel{font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
-.rvalue{font-family:var(--mono);font-size:36px;font-weight:800;color:var(--good);}
-.rsub{font-size:13px;color:var(--muted);margin-top:6px;}
-.rdivider{height:1px;background:var(--line);margin:20px 0;}
-.rmini{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;color:var(--muted);}
-.rmini b{color:var(--text);font-family:var(--mono);}
-.disclaimer{font-size:11.5px;color:var(--muted2);margin-top:16px;}
-.pricing-grid{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-@media (max-width:900px){.pricing-grid{grid-template-columns:1fr;}}
-.plan{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:30px;display:flex;flex-direction:column;}
-.plan.hi{border-color:var(--instant);position:relative;}
-.plan.hi::before{content:"MOST PICKED";position:absolute;top:-11px;left:24px;background:var(--instant);color:#0B0D11;font-family:var(--mono);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;}
-.plan .pname{font-size:14px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;}
-.plan .pprice{font-size:26px;font-weight:800;font-family:var(--mono);margin:10px 0 2px;}
-.plan .pprice span{font-size:13px;color:var(--muted);font-weight:400;}
-.plan .pdesc{font-size:13px;color:var(--muted);margin-bottom:20px;}
-.plan ul{list-style:none;margin-bottom:24px;flex:1;}
-.plan li{font-size:13.5px;padding:8px 0;border-top:1px solid var(--line);color:var(--muted);display:flex;gap:8px;}
-.plan .pbtn{text-align:center;padding:12px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--line);display:block;}
-.plan.hi .pbtn{background:var(--instant);color:#0B0D11;border:none;}
-.cta{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);text-align:center;padding:80px 0;}
-.cta h2{margin:0 auto 12px;max-width:600px;}
-.cta .lead{margin:0 auto 28px;max-width:480px;}
-footer{padding:48px 0;}
-.footgrid{display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;color:var(--muted);font-size:13px;}
-.footgrid a{color:var(--standard);}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center;padding:20px;}
-.modal.open{display:flex;}
-.modalbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;max-width:640px;width:100%;max-height:85vh;overflow:auto;padding:0;}
-.modaltop{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);}
-.modalclose{background:none;border:1px solid var(--line);color:var(--text);width:30px;height:30px;border-radius:6px;cursor:pointer;}
-.demo{padding:20px;}
-.vlist{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
-.vcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;}
-.vcard .vname{font-weight:700;}
-.vcard .vsub{color:var(--muted);font-size:11.5px;}
-.log{border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;height:160px;overflow:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
-.log .m{max-width:80%;padding:8px 11px;border-radius:8px;background:var(--surface2);}
-.log .m.us{align-self:flex-end;background:rgba(61,126,255,0.18);}
-.demo-btns{display:flex;gap:10px;flex-wrap:wrap;}
-[dir="rtl"] .log .m.us{align-self:flex-start;}
+  :root {
+    --bg: #10151C;
+    --surface: #171F28;
+    --surface-raised: #1E2733;
+    --border: #29323D;
+    --border-soft: #212A34;
+    --text: #EDEFF2;
+    --text-muted: #8A96A5;
+    --accent: #E8A33D;
+    --accent-soft: #F0BE6E;
+    --accent-dim: #3D3117;
+    --success: #4FC38A;
+    --success-dim: #1B3327;
+    --danger: #E56A5D;
+    --danger-dim: #3A2320;
+    --info: #6C9BF5;
+    --info-dim: #1E2940;
+    --muted-pill: #333D48;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(232,163,61,0.06), transparent),
+      var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+  }
+  body[dir="rtl"] { flex-direction: row-reverse; }
+  body[dir="rtl"] .brand, body[dir="rtl"] label, body[dir="rtl"] th, body[dir="rtl"] td,
+  body[dir="rtl"] .subtitle, body[dir="rtl"] h1, body[dir="rtl"] h2 { text-align: right; }
+  body[dir="rtl"] nav { border-right: none; border-left: 1px solid var(--border); }
+  body[dir="rtl"] nav button { text-align: right; border-left: none; border-right: 2px solid transparent; }
+  body[dir="rtl"] nav button.active { border-left: none; border-right-color: var(--accent); }
+  body[dir="rtl"] .msg { border-left: none; border-right: 2px solid var(--border); padding: 6px 12px 6px 0; }
+  body[dir="rtl"] .msg.outbound { border-right-color: var(--info); }
+  body[dir="rtl"] .msg.inbound { border-right-color: var(--accent); }
+  body[dir="rtl"] .modal-close { right: auto; left: 24px; }
+  nav {
+    width: 226px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 26px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  nav .brand {
+    font-size: 15.5px;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    padding: 0 24px 12px;
+    color: var(--text);
+  }
+  nav .brand span { color: var(--accent); }
+  nav .tagline { padding: 0 24px 20px; font-size: 11.5px; color: var(--text-muted); border-bottom: 1px solid var(--border); margin-bottom: 14px; line-height: 1.5; }
+  nav button.nav-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 10px 24px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: color 0.12s, background 0.12s;
+  }
+  nav button.nav-btn:hover { color: var(--text); background: var(--surface-raised); }
+  nav button.nav-btn.active { color: var(--accent); border-left-color: var(--accent); background: var(--surface-raised); }
+  .nav-spacer { flex: 1; }
+  .lang-switch { padding: 0 24px; margin-top: 8px; }
+  .lang-switch label { margin: 0 0 6px; font-size: 11px; text-transform: none; color: var(--text-muted); }
+  .lang-switch select { font-size: 13px; padding: 6px 8px; }
+  main { flex: 1; padding: 34px 42px 60px; max-width: 1140px; }
+  h1 { font-size: 23px; font-weight: 650; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 16px; font-weight: 600; }
+  .subtitle { color: var(--text-muted); font-size: 14px; margin: 0 0 26px; max-width: 620px; line-height: 1.5; }
+  .panel { display: none; animation: fadeUp 0.25s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  /* Stats strip */
+  .stats-strip { display: flex; gap: 14px; margin-bottom: 26px; flex-wrap: wrap; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px; min-width: 130px; flex: 1; }
+  .stat-card .num { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
+  .stat-card .label { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+  .stat-card.accent-success .num { color: var(--success); }
+  .stat-card.accent-warn .num { color: var(--accent); }
+  .stat-card.accent-danger .num { color: var(--danger); }
+  .stat-card.accent-info .num { color: var(--info); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; color: var(--text-muted); font-weight: 500; font-size: 12px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  tr.row { transition: background 0.1s; }
+  tr.row:hover { background: var(--surface-raised); cursor: pointer; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--text-muted); }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 550; }
+  .pill-confirmed { background: var(--success-dim); color: var(--success); }
+  .pill-negotiating { background: var(--accent-dim); color: var(--accent); }
+  .pill-escalated { background: var(--danger-dim); color: var(--danger); }
+  .pill-declined { background: var(--muted-pill); color: var(--text-muted); }
+  .pill-awaiting_response, .pill-sent { background: var(--info-dim); color: var(--info); }
+  .card { background: var(--surface); border: 1px solid var(--border); padding: 26px; border-radius: 8px; max-width: 540px; }
+  label { display: block; font-size: 13px; color: var(--text-muted); margin: 14px 0 5px; }
+  label:first-child { margin-top: 0; }
+  input, textarea, select {
+    width: 100%; background: var(--surface-raised); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 11px; border-radius: 5px; font-size: 14px; font-family: inherit;
+    transition: border-color 0.12s;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  textarea { min-height: 70px; resize: vertical; }
+  .row-fields { display: flex; gap: 12px; }
+  .row-fields > div { flex: 1; }
+  button.primary {
+    margin-top: 22px; background: var(--accent); color: #1A1305; border: none;
+    padding: 11px 20px; border-radius: 5px; font-size: 14px; font-weight: 650; cursor: pointer;
+    transition: transform 0.08s, opacity 0.12s;
+  }
+  button.primary:hover { opacity: 0.92; }
+  button.primary:active { transform: scale(0.98); }
+  button.secondary {
+    background: none; border: 1px solid var(--border); color: var(--text);
+    padding: 8px 14px; border-radius: 5px; font-size: 13px; cursor: pointer; margin-right: 8px; margin-top: 8px;
+    transition: border-color 0.12s, color 0.12s;
+  }
+  button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .vendor-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .vendor-row input { flex: 1; }
+  .vendor-row select { flex: 0 0 120px; }
+  .vendor-row button { flex-shrink: 0; background: none; border: 1px solid var(--border); color: var(--danger); border-radius: 5px; padding: 6px 10px; cursor: pointer; }
+  .proposal-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 5px; margin-bottom: 6px; font-size: 13.5px; }
+  .proposal-item input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+  .proposal-item .price { margin-left: auto; color: var(--success); font-weight: 600; }
+  body[dir="rtl"] .proposal-item .price { margin-left: 0; margin-right: auto; }
+  .empty { color: var(--text-muted); font-size: 14px; padding: 48px 0; text-align: center; }
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(8,10,13,0.62); align-items: center; justify-content: center; z-index: 10; }
+  .modal-backdrop.active { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 28px; width: 580px; max-height: 82vh; overflow-y: auto; position: relative; }
+  .modal h2 { font-size: 17.5px; margin: 0 0 4px; }
+  .modal .meta { color: var(--text-muted); font-size: 13px; margin-bottom: 16px; }
+  .msg { border-left: 2px solid var(--border); padding: 6px 0 6px 12px; margin-bottom: 8px; font-size: 13.5px; }
+  .msg.outbound { border-left-color: var(--info); }
+  .msg.inbound { border-left-color: var(--accent); }
+  .msg .dir { color: var(--text-muted); font-size: 11px; margin-bottom: 2px; }
+  .modal-close { position: absolute; top: 20px; right: 24px; background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; }
+  .modal-actions { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px; }
+  .status-strip { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+  .status-chip { background: var(--surface); border: 1px solid var(--border); padding: 10px 16px; border-radius: 6px; font-size: 12.5px; }
+  .status-chip .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+  .dot-on { background: var(--success); }
+  .dot-off { background: var(--text-muted); }
+  .compare-picker { display: flex; gap: 10px; margin-bottom: 20px; }
+  .compare-picker select { flex: 1; }
+  /* How it works panel */
+  .split { display: flex; gap: 20px; flex-wrap: wrap; }
+  .split-col { flex: 1; min-width: 300px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 22px 24px; }
+  .split-col.automated { border-top: 2px solid var(--success); }
+  .split-col.manual { border-top: 2px solid var(--info); }
+  .split-col h2 { margin-top: 0; }
+  .split-col h2.automated-title { color: var(--success); }
+  .split-col h2.manual-title { color: var(--info); }
+  .split-col ul { padding-left: 18px; margin: 14px 0 0; }
+  body[dir="rtl"] .split-col ul { padding-left: 0; padding-right: 18px; }
+  .split-col li { font-size: 13.5px; margin-bottom: 10px; line-height: 1.5; color: var(--text); }
+  .split-col li .li-sub { color: var(--text-muted); font-size: 12.5px; display: block; margin-top: 1px; }
+  code { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 12.5px; }
+  #toast-stack { position: fixed; bottom: 24px; right: 24px; z-index: 20; display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+  body[dir="rtl"] #toast-stack { right: auto; left: 24px; }
+  .toast { background: var(--surface-raised); border: 1px solid var(--border); border-left: 3px solid var(--info); border-radius: 6px; padding: 12px 16px; font-size: 13px; line-height: 1.5; white-space: pre-line; animation: toastIn 0.18s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+  body[dir="rtl"] .toast { border-left: 1px solid var(--border); border-right: 3px solid var(--info); }
+  .toast.success { border-left-color: var(--success); }
+  .toast.error { border-left-color: var(--danger); }
+  .toast.warn { border-left-color: var(--accent); }
+  body[dir="rtl"] .toast.success { border-right-color: var(--success); }
+  body[dir="rtl"] .toast.error { border-right-color: var(--danger); }
+  body[dir="rtl"] .toast.warn { border-right-color: var(--accent); }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  button.primary.loading, button.secondary.loading { opacity: 0.6; pointer-events: none; }
+  @media (max-width: 820px) {
+    body, body[dir="rtl"] { flex-direction: column; }
+    nav { width: 100%; height: auto; position: static; padding: 16px 0; border-right: none; border-bottom: 1px solid var(--border); flex-direction: row; align-items: center; overflow-x: auto; }
+    body[dir="rtl"] nav { border-left: none; border-bottom: 1px solid var(--border); }
+    nav .brand, nav .tagline { display: none; }
+    nav button.nav-btn { border-left: none; border-bottom: 2px solid transparent; white-space: nowrap; padding: 10px 16px; }
+    nav button.nav-btn.active { border-left: none; border-bottom-color: var(--accent); }
+    .nav-spacer { display: none; }
+    .lang-switch { padding: 0 16px; margin: 0; }
+    main { padding: 24px 20px 50px; }
+    .split { flex-direction: column; }
+    .row-fields { flex-direction: column; gap: 0; }
+    .modal { width: 92vw; padding: 20px; }
+  }
 </style>
 </head>
-<body>
+<body dir="ltr">
 <nav>
-<div class="wrap">
-<div class="logo"><span class="dot"></span>Msafara</div>
-<div class="navlinks"><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#demo-section">Demo</a></div>
-<div class="navright">
-<select class="langsel" id="langsel" onchange="setLang(this.value)">
-<option value="en">EN</option>
-<option value="ar">Arabic</option>
-<option value="fr">FR</option>
-<option value="sw">SW</option>
-<option value="es">ES</option>
-</select>
-<button class="iconbtn" id="themebtn" onclick="toggleTheme()">&#9680;</button>
-<a class="navcta" href="mailto:wadherapryank@gmail.com?subject=Book a Msafara demo">Book a demo</a>
-<button class="hamburger" onclick="document.getElementById('drawer').classList.toggle('open')">&#9776;</button>
-</div>
-</div>
-<div class="drawer" id="drawer"><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#demo-section">Demo</a></div>
+  <div class="brand">Vendor <span>Control</span></div>
+  <div class="tagline" data-i18n="tagline">Automated vendor coordination for tour operators.</div>
+  <button class="nav-btn active" data-panel="queue" data-i18n="nav_queue">Queue</button>
+  <button class="nav-btn" data-panel="new" data-i18n="nav_new">New Request</button>
+  <button class="nav-btn" data-panel="sourcing" data-i18n="nav_sourcing">New Sourcing</button>
+  <button class="nav-btn" data-panel="compare" data-i18n="nav_compare">Compare Sourcing</button>
+  <button class="nav-btn" data-panel="vendors" data-i18n="nav_vendors">Vendor Directory</button>
+  <button class="nav-btn" data-panel="proposal" data-i18n="nav_proposal">Generate Proposal</button>
+  <button class="nav-btn" data-panel="how" data-i18n="nav_how">How It Works</button>
+  <button class="nav-btn" data-panel="status" data-i18n="nav_status">System Status</button>
+  <div class="nav-spacer"></div>
+  <div class="lang-switch">
+    <label data-i18n="lang_label">Language</label>
+    <select id="lang-picker" onchange="setLang(this.value)">
+      <option value="en">English</option>
+      <option value="ar">العربية</option>
+      <option value="fr">Français</option>
+      <option value="sw">Kiswahili</option>
+      <option value="hi">हिन्दी</option>
+    </select>
+  </div>
 </nav>
-<header class="hero">
-<div class="wrap">
-<div class="eyebrow">AI vendor coordination for tour operators and DMCs</div>
-<h1>Stop chasing vendors over <em>email and WhatsApp</em>, and let Msafara run the thread.</h1>
-<p class="sub">Msafara drafts outreach, follows up when a vendor goes quiet, negotiates within the rules you set, tracks hold deadlines, and turns confirmed bookings into a client-ready proposal, for operators running multi-vendor, multi-day itineraries where coordination still happens over email and WhatsApp, not a GDS.</p>
-<div class="herobtns">
-<a class="btn-primary" href="mailto:wadherapryank@gmail.com?subject=Book a Msafara demo">Book a demo</a>
-<a class="btn-secondary" href="#how">See how it works</a>
+<main>
+  <div class="panel active" id="panel-queue">
+    <h1 data-i18n="queue_title">Open requests</h1>
+    <p class="subtitle" data-i18n="queue_subtitle">Every vendor request, current status, last updated.</p>
+    <div class="stats-strip" id="stats-strip"></div>
+    <div id="queue-actions" style="margin-bottom: 18px;">
+      <button class="secondary" onclick="runCheck()" data-i18n="btn_run_check">Run check (timeout + expiring holds)</button>
+      <button class="secondary" onclick="runPoll()" data-i18n="btn_poll">Poll inbox</button>
+    </div>
+    <table>
+      <thead><tr>
+        <th data-i18n="th_request">Request</th><th data-i18n="th_vendor">Vendor</th>
+        <th data-i18n="th_need">Need</th><th data-i18n="th_status">Status</th><th data-i18n="th_updated">Updated</th>
+      </tr></thead>
+      <tbody id="queue-body"></tbody>
+    </table>
+    <div id="queue-empty" class="empty" style="display:none;" data-i18n="queue_empty">No requests yet — create one under New Request.</div>
+  </div>
+  <div class="panel" id="panel-new">
+    <h1 data-i18n="new_title">New vendor request</h1>
+    <p class="subtitle" data-i18n="new_subtitle">Draft and send a request to a single vendor.</p>
+    <div class="card">
+      <label data-i18n="f_vendor_name">Vendor name</label><input id="nr-vendor-name" placeholder="e.g. Amara">
+      <label data-i18n="f_channel">Contact channel</label>
+      <select id="nr-vendor-channel" onchange="updateAddressPlaceholder('nr')">
+        <option value="email" data-i18n="channel_email">email</option>
+        <option value="whatsapp" data-i18n="channel_whatsapp">WhatsApp</option>
+      </select>
+      <label data-i18n="f_contact_address">Contact address</label><input id="nr-vendor-address" placeholder="amara@example.com">
+      <label data-i18n="f_category">Category</label>
+      <select id="nr-category">
+        <option value="accommodation" data-i18n="cat_accommodation">accommodation</option>
+        <option value="transport" data-i18n="cat_transport">transport</option>
+        <option value="activity" data-i18n="cat_activity">activity</option>
+      </select>
+      <label data-i18n="f_description">Description</label><input id="nr-description" placeholder="15 rooms, 3-star, Stone Town">
+      <label data-i18n="f_dates">Dates</label><input id="nr-dates" placeholder="2026-06-05 to 2026-06-08">
+      <div class="row-fields">
+        <div><label data-i18n="f_quantity">Quantity</label><input id="nr-quantity" type="number"></div>
+        <div><label data-i18n="f_budget_min">Budget min</label><input id="nr-budget-min" type="number"></div>
+        <div><label data-i18n="f_budget_max">Budget max</label><input id="nr-budget-max" type="number"></div>
+      </div>
+      <button class="primary" onclick="createRequest()" data-i18n="btn_send_request">Send request</button>
+    </div>
+  </div>
+  <div class="panel" id="panel-sourcing">
+    <h1 data-i18n="sourcing_title">New competitive sourcing</h1>
+    <p class="subtitle" data-i18n="sourcing_subtitle">Send the same need to several vendors and compare responses.</p>
+    <div class="card">
+      <label data-i18n="f_category">Category</label>
+      <select id="ns-category">
+        <option value="accommodation" data-i18n="cat_accommodation">accommodation</option>
+        <option value="transport" data-i18n="cat_transport">transport</option>
+        <option value="activity" data-i18n="cat_activity">activity</option>
+      </select>
+      <label data-i18n="f_description">Description</label><input id="ns-description" placeholder="15 rooms, 3-star">
+      <label data-i18n="f_dates">Dates</label><input id="ns-dates" placeholder="2026-06-05 to 2026-06-08">
+      <div class="row-fields">
+        <div><label data-i18n="f_quantity">Quantity</label><input id="ns-quantity" type="number"></div>
+        <div><label data-i18n="f_budget_min">Budget min</label><input id="ns-budget-min" type="number"></div>
+        <div><label data-i18n="f_budget_max">Budget max</label><input id="ns-budget-max" type="number"></div>
+      </div>
+      <label data-i18n="f_vendors">Vendors</label>
+      <div id="vendor-rows"></div>
+      <button class="secondary" onclick="addVendorRow()" data-i18n="btn_add_vendor">+ Add vendor</button>
+      <br>
+      <button class="primary" onclick="createSourcing()" data-i18n="btn_send_all">Send to all vendors</button>
+    </div>
+  </div>
+  <div class="panel" id="panel-compare">
+    <h1 data-i18n="compare_title">Compare sourcing responses</h1>
+    <p class="subtitle" data-i18n="compare_subtitle">See who's responded and how they rank on price.</p>
+    <div class="compare-picker">
+      <select id="sourcing-picker" onchange="loadCompare()"></select>
+    </div>
+    <div id="compare-results"></div>
+  </div>
+  <div class="panel" id="panel-vendors">
+    <h1 data-i18n="vendors_title">Vendor directory</h1>
+    <p class="subtitle" data-i18n="vendors_subtitle">Builds itself from usage — every vendor you've contacted, with a live confirm rate.</p>
+    <table>
+      <thead><tr>
+        <th data-i18n="th_vendor">Vendor</th><th data-i18n="th_channel">Channel</th><th data-i18n="th_category">Category</th>
+        <th data-i18n="th_requests">Requests</th><th data-i18n="th_confirm_rate">Confirm rate</th><th data-i18n="th_last_used">Last used</th>
+      </tr></thead>
+      <tbody id="vendors-body"></tbody>
+    </table>
+    <div id="vendors-empty" class="empty" style="display:none;" data-i18n="vendors_empty">No vendors yet — they're added automatically the first time you send a request.</div>
+  </div>
+  <div class="panel" id="panel-proposal">
+    <h1 data-i18n="proposal_title">Generate client proposal</h1>
+    <p class="subtitle" data-i18n="proposal_subtitle">Pick confirmed requests to include — pulls the actual agreed rates into a downloadable document.</p>
+    <div class="card" style="max-width: 640px;">
+      <label data-i18n="f_trip_title">Trip title</label><input id="pp-trip-title" placeholder="Kilimanjaro & Zanzibar — 12 pax">
+      <label data-i18n="f_client_name">Client name (optional)</label><input id="pp-client-name" placeholder="Acme Adventures Ltd">
+      <label data-i18n="f_select_confirmed">Confirmed requests to include</label>
+      <div id="proposal-checklist" style="margin-top:6px;"></div>
+      <button class="primary" onclick="generateProposal()" data-i18n="btn_generate_proposal">Generate & download</button>
+    </div>
+  </div>
+  <div class="panel" id="panel-how">
+    <h1 data-i18n="how_title">What's automated, what's you</h1>
+    <p class="subtitle" data-i18n="how_subtitle">A clear line between what this platform does on its own and what still needs a person — nothing runs unsupervised where judgment actually matters.</p>
+    <div class="split">
+      <div class="split-col automated">
+        <h2 class="automated-title" data-i18n="how_auto_heading">Handled automatically</h2>
+        <ul>
+          <li data-i18n="auto_1">Drafting the first request to a vendor from the need you enter</li>
+          <li data-i18n="auto_2">Parsing a vendor's reply into structured availability, rate, and terms</li>
+          <li data-i18n="auto_3">Following up after silence, on a bounded schedule, so nothing goes quiet forever</li>
+          <li data-i18n="auto_4">Counter-offering once a quote comes in above budget, up to a capped number of rounds</li>
+          <li data-i18n="auto_5">Confirming a booking the moment terms are clearly acceptable</li>
+          <li data-i18n="auto_6">Tracking hold expiry deadlines and flagging ones about to lapse</li>
+          <li data-i18n="auto_7">Fanning one need out to several vendors and ranking confirmed offers by price</li>
+          <li data-i18n="auto_8">Splitting a single reply that answers more than one line item at once</li>
+          <li data-i18n="auto_9">Registering vendors in the directory automatically and tracking their real confirm rate</li>
+          <li data-i18n="auto_10">Routing each outbound message to email or WhatsApp based on the vendor's channel</li>
+        </ul>
+      </div>
+      <div class="split-col manual">
+        <h2 class="manual-title" data-i18n="how_manual_heading">Still needs you</h2>
+        <ul>
+          <li data-i18n="manual_1">Any reply that's ambiguous, partial, or a counter-offer the agent can't resolve on its own</li>
+          <li data-i18n="manual_2">Deciding your actual walk-away price and negotiation rules — the defaults are placeholders</li>
+          <li data-i18n="manual_3">Marking a confirmed hold as truly locked in once you've actually paid or booked</li>
+          <li data-i18n="manual_4">Reopening a confirmed booking when a client detail changes after the fact</li>
+          <li data-i18n="manual_5">Sending the message yourself if SMTP isn't connected — the draft is ready either way</li>
+          <li data-i18n="manual_6">Choosing between two ranked offers in a sourcing comparison — price isn't the only factor</li>
+          <li data-i18n="manual_7">Recording a WhatsApp reply yourself — there's no inbound polling for WhatsApp the way IMAP works for email</li>
+          <li data-i18n="manual_8">Picking which confirmed requests go into a client proposal, and reviewing it before it's sent</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-status">
+    <h1 data-i18n="status_title">System status</h1>
+    <p class="subtitle" data-i18n="status_subtitle">What's actually wired up versus running in mock mode.</p>
+    <div class="status-strip" id="status-strip"></div>
+    <p class="subtitle" style="max-width: 560px;" data-i18n="status_note">Mock mode uses rule-based stand-ins for drafting and parsing so the platform runs without an API key. Set ANTHROPIC_API_KEY, SMTP_*, and IMAP_* environment variables to make dispatch and inbox polling real.</p>
+  </div>
+</main>
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div id="modal-content"></div>
+  </div>
 </div>
-<div class="board">
-<div class="board-top"><span class="b1">Live vendor board</span><span class="live"><span class="pulse"></span>LIVE</span></div>
-<div class="board-rows"><div class="board-track" id="track">
-<div class="row"><span class="id">V-118</span><span class="who">Zanzibar Beach Villas</span><span class="amt">$1,240</span><span class="status urg">hold 6h</span></div>
-<div class="row"><span class="id">V-104</span><span class="who">Nairobi Transport Co.</span><span class="amt">$310</span><span class="status wait">waiting</span></div>
-<div class="row"><span class="id">V-097</span><span class="who">Dubai Desert Safaris</span><span class="amt">$860</span><span class="status ok">confirmed</span></div>
-<div class="row"><span class="id">V-085</span><span class="who">Serengeti Lodge Group</span><span class="amt">$1,180</span><span class="status neg">negotiating</span></div>
-<div class="row"><span class="id">V-071</span><span class="who">Doha Airport Transfers</span><span class="amt">$75</span><span class="status ok">confirmed</span></div>
-<div class="row"><span class="id">V-063</span><span class="who">Maasai Mara Camps</span><span class="amt">$980</span><span class="status wait">waiting</span></div>
-<div class="row"><span class="id">V-118</span><span class="who">Zanzibar Beach Villas</span><span class="amt">$1,240</span><span class="status urg">hold 6h</span></div>
-<div class="row"><span class="id">V-104</span><span class="who">Nairobi Transport Co.</span><span class="amt">$310</span><span class="status wait">waiting</span></div>
-<div class="row"><span class="id">V-097</span><span class="who">Dubai Desert Safaris</span><span class="amt">$860</span><span class="status ok">confirmed</span></div>
-<div class="row"><span class="id">V-085</span><span class="who">Serengeti Lodge Group</span><span class="amt">$1,180</span><span class="status neg">negotiating</span></div>
-<div class="row"><span class="id">V-071</span><span class="who">Doha Airport Transfers</span><span class="amt">$75</span><span class="status ok">confirmed</span></div>
-<div class="row"><span class="id">V-063</span><span class="who">Maasai Mara Camps</span><span class="amt">$980</span><span class="status wait">waiting</span></div>
-</div></div>
-</div>
-</div>
-</header>
-<section class="stats"><div class="wrap">
-<div class="stat"><div class="n">5</div><div class="l">Languages, incl. full Arabic RTL</div></div>
-<div class="stat"><div class="n">2</div><div class="l">Channels, email and WhatsApp, one dashboard</div></div>
-<div class="stat"><div class="n">6+</div><div class="l">Vendor scenarios handled automatically</div></div>
-<div class="stat"><div class="n">Mins</div><div class="l">Zero to first proposal, not days</div></div>
-</div></section>
-<section><div class="wrap">
-<div class="tag">The problem</div>
-<h2>You're running a network by hand</h2>
-<p class="lead">The coordination work doesn't show up on an invoice, but it eats the week.</p>
-<div class="problem-grid">
-<div class="pcard"><div class="pnum">01</div><h3>A vendor goes quiet mid-negotiation</h3><p>The thread stalls, nobody follows up on schedule, and the deal drifts until it's too late to recover.</p></div>
-<div class="pcard"><div class="pnum">02</div><h3>A hold deadline slips past</h3><p>A locked rate expires because no one was watching the clock across a dozen open threads at once.</p></div>
-<div class="pcard"><div class="pnum">03</div><h3>Comparing quotes means reopening ten tabs</h3><p>The side-by-side comparison lives in your head and a scratch notepad, not on a screen.</p></div>
-<div class="pcard"><div class="pnum">04</div><h3>Confirmed bookings get retyped by hand</h3><p>Numbers move from an email into a spreadsheet into a proposal document, one typo at a time.</p></div>
-</div>
-</div></section>
-<section id="how"><div class="wrap">
-<div class="tag">How it works</div>
-<h2>Three steps, no new workflow to learn</h2>
-<div class="steps">
-<div class="step"><div class="sn">01</div><h3>Set your requirements and your rules</h3><p>Describe the itinerary once: dates, headcount, budget ceiling, and what you'll accept without being asked.</p></div>
-<div class="step"><div class="sn">02</div><h3>Msafara runs the outreach</h3><p>It drafts and sends requests over email or WhatsApp, follows up when a vendor goes quiet, and negotiates within the bounds you set.</p></div>
-<div class="step"><div class="sn">03</div><h3>You get a ranked comparison, then a proposal</h3><p>Replies land side by side by price as they arrive. Confirmed bookings become a client-ready document automatically.</p></div>
-</div>
-</div></section>
-<section id="features"><div class="wrap">
-<div class="tag">Features</div>
-<h2>Everything the coordination work actually needs</h2>
-<div class="feat-grid">
-<div class="feat"><div class="ic">&#9993;</div><h4>Automated vendor outreach</h4><p>Drafts and sends requests over email or WhatsApp from a single form.</p></div>
-<div class="feat"><div class="ic">&#129309;</div><h4>Smart negotiation</h4><p>Counters over-budget quotes automatically within bounds you set, and knows when to hand the decision back to you.</p></div>
-<div class="feat"><div class="ic">&#128202;</div><h4>Competitive sourcing</h4><p>One need, several vendors, ranked side by side by price as replies land.</p></div>
-<div class="feat"><div class="ic">&#8987;</div><h4>Deadline tracking</h4><p>Flags holds about to expire before you lose the rate.</p></div>
-<div class="feat"><div class="ic">&#128196;</div><h4>One-click proposals</h4><p>Confirmed bookings become a polished, downloadable client quote, no retyping numbers.</p></div>
-<div class="feat"><div class="ic">&#127760;</div><h4>Built multilingual</h4><p>A five-language dashboard with genuine right-to-left support for Arabic, not just translated labels.</p></div>
-</div>
-</div></section>
-<section><div class="wrap">
-<div class="tag">Your numbers</div>
-<h2>Estimate the hours this gets back</h2>
-<p class="lead">Move the sliders to match how you work today. The time-saved assumption is yours to adjust; there's no pilot data yet, so we're not going to pretend otherwise.</p>
-<div class="calc">
-<div class="calc-inner">
-<div class="calc-form">
-<div class="field-row"><label>Itineraries sourced per month<span class="v" id="v1">10</span></label><input type="range" id="s1" min="1" max="60" value="10" oninput="calc()"></div>
-<div class="field-row"><label>Hours spent per itinerary chasing vendors<span class="v" id="v2">6</span></label><input type="range" id="s2" min="1" max="20" value="6" oninput="calc()"></div>
-<div class="field-row"><label>Your time, per hour ($)<span class="v" id="v3">25</span></label><input type="range" id="s3" min="5" max="150" value="25" oninput="calc()"></div>
-<div class="field-row"><label>Assumed time saved by automating outreach<span class="v" id="v4">50%</span></label><input type="range" id="s4" min="0" max="90" value="50" oninput="calc()"></div>
-</div>
-<div class="calc-result">
-<div class="rlabel">Estimated time back / month</div>
-<div class="rvalue" id="rhours">30 hrs</div>
-<div class="rsub">at your inputs, hours no longer spent chasing threads</div>
-<div class="rdivider"></div>
-<div class="rmini"><span>Value of that time / month</span><b id="rvaluex">$750</b></div>
-<div class="rmini"><span>Value of that time / year</span><b id="ryear">$9,000</b></div>
-<div class="disclaimer">Illustrative estimate based on the inputs above, not a performance guarantee. Msafara has not yet run pilot data against real vendors.</div>
-</div>
-</div>
-</div>
-</div></section>
-<section id="pricing"><div class="wrap">
-<div class="tag">Pricing</div>
-<h2>Structure now, numbers once cost is modeled</h2>
-<p class="lead">Final prices depend on LLM and messaging costs per request. Get in touch and we'll scope it to your volume.</p>
-<div class="pricing-grid">
-<div class="plan"><div class="pname">Starter</div><div class="pprice">Contact us</div><div class="pdesc">For solo operators testing the workflow.</div><ul><li>Capped requests / month</li><li>Single language</li><li>Email only</li></ul><a class="pbtn" href="mailto:wadherapryank@gmail.com?subject=Msafara Starter">Get in touch</a></div>
-<div class="plan hi"><div class="pname">Growth</div><div class="pprice">Contact us</div><div class="pdesc">For small teams running multiple itineraries at once.</div><ul><li>WhatsApp + email</li><li>Unlimited requests</li><li>Vendor directory</li><li>Proposal generation</li></ul><a class="pbtn" href="mailto:wadherapryank@gmail.com?subject=Msafara Growth">Get in touch</a></div>
-<div class="plan"><div class="pname">Enterprise</div><div class="pprice">Custom</div><div class="pdesc">For larger DMCs with specific rules and support needs.</div><ul><li>Multi-user</li><li>Custom negotiation rules</li><li>Priority support</li><li>White-label</li></ul><a class="pbtn" href="mailto:wadherapryank@gmail.com?subject=Msafara Enterprise">Get in touch</a></div>
-</div>
-</div></section>
-<section class="cta"><div class="wrap">
-<h2>Ready to stop babysitting vendor threads?</h2>
-<p class="lead">See it running against a mock itinerary in a few minutes.</p>
-<div class="herobtns" style="justify-content:center">
-<a class="btn-primary" href="mailto:wadherapryank@gmail.com?subject=Book a Msafara demo">Book a demo</a>
-<button class="btn-secondary" onclick="document.getElementById('demoModal').classList.add('open')">Try the live demo</button>
-</div>
-</div></section>
-<footer><div class="wrap footgrid">
-<div>&copy; 2026 Msafara. All rights reserved.</div>
-<div><a href="mailto:wadherapryank@gmail.com">wadherapryank@gmail.com</a> &middot; <a href="https://wa.me/917397829282" target="_blank" rel="noopener">WhatsApp</a></div>
-</div></footer>
-<div class="modal" id="demoModal"><div class="modalbox">
-<div class="modaltop"><strong>Live demo, mock workspace</strong><button class="modalclose" onclick="document.getElementById('demoModal').classList.remove('open')">&times;</button></div>
-<div class="demo" id="demo-section">
-<div class="vlist">
-<div class="vcard"><div><div class="vname">Zanzibar Beach Villas</div><div class="vsub">4 nights, hold expires in 6h</div></div><div class="status urg">urgent</div></div>
-<div class="vcard"><div><div class="vname">Nairobi Transport Co.</div><div class="vsub">Airport transfer, awaiting reply</div></div><div class="status wait">waiting</div></div>
-<div class="vcard"><div><div class="vname">Serengeti Lodge Group</div><div class="vsub">3 nights, confirmed at $1,180</div></div><div class="status ok">confirmed</div></div>
-</div>
-<div class="log" id="demoLog">
-<div class="m">Msafara to Zanzibar Beach Villas: Requesting 4 nights, 2 rooms, Oct 12 to 16, budget $1,050.</div>
-<div class="m">Zanzibar Beach Villas: We can offer $1,240 for those dates.</div>
-<div class="m us">Msafara: Countered at $1,050 per your rules, awaiting reply.</div>
-</div>
-<div class="demo-btns">
-<button class="btn-secondary" onclick="demoStep()">Simulate next vendor reply</button>
-<button class="btn-secondary" onclick="toggleDemoRTL()">Preview in Arabic (RTL)</button>
-</div>
-</div>
-</div></div>
+<div id="toast-stack"></div>
 <script>
-function setLang(v){var demo=document.getElementById('demoModal');if(v==='ar'){demo.setAttribute('dir','rtl');}else{demo.removeAttribute('dir');}}
-function toggleDemoRTL(){var demo=document.getElementById('demoModal');if(demo.getAttribute('dir')==='rtl'){demo.removeAttribute('dir');}else{demo.setAttribute('dir','rtl');}}
-function toggleTheme(){var html=document.documentElement;var cur=html.getAttribute('data-theme');var next=cur==='light'?'dark':'light';html.setAttribute('data-theme',next);localStorage.setItem('msafara-theme',next);}
-(function(){var saved=localStorage.getItem('msafara-theme');if(saved){document.documentElement.setAttribute('data-theme',saved);}else{var h=new Date().getHours();document.documentElement.setAttribute('data-theme',(h>=7&&h<19)?'light':'dark');}})();
-var demoMessages=[["Nairobi Transport Co.: Confirmed, $310, driver assigned.",false],["Msafara to Nairobi Transport Co.: Great, locking it in and updating your comparison.",true],["Serengeti Lodge Group: Final hold reminder, rate expires in 2 hours.",false],["Msafara: Reminder flagged, escalating to you now.",true]];
-var demoIdx=0;
-function demoStep(){if(demoIdx>=demoMessages.length)return;var log=document.getElementById('demoLog');var d=document.createElement('div');d.className='m'+(demoMessages[demoIdx][1]?' us':'');d.textContent=demoMessages[demoIdx][0];log.appendChild(d);log.scrollTop=log.scrollHeight;demoIdx++;}
-function calc(){var n=+document.getElementById('s1').value;var h=+document.getElementById('s2').value;var r=+document.getElementById('s3').value;var p=+document.getElementById('s4').value;document.getElementById('v1').textContent=n;document.getElementById('v2').textContent=h;document.getElementById('v3').textContent=r;document.getElementById('v4').textContent=p+'%';var savedHours=Math.round(n*h*(p/100));var val=savedHours*r;document.getElementById('rhours').textContent=savedHours+' hrs';document.getElementById('rvaluex').textContent='$'+val.toLocaleString();document.getElementById('ryear').textContent='$'+(val*12).toLocaleString();}
-calc();
+const I18N = {
+  en: {
+    tagline: "Automated vendor coordination for tour operators.",
+    nav_queue: "Queue", nav_new: "New Request", nav_sourcing: "New Sourcing",
+    nav_compare: "Compare Sourcing", nav_vendors: "Vendor Directory", nav_proposal: "Generate Proposal", nav_how: "How It Works", nav_status: "System Status",
+    lang_label: "Language",
+    queue_title: "Open requests", queue_subtitle: "Every vendor request, current status, last updated.",
+    queue_empty: "No requests yet — create one under New Request.",
+    btn_run_check: "Run check (timeout + expiring holds)", btn_poll: "Poll inbox",
+    th_request: "Request", th_vendor: "Vendor", th_need: "Need", th_status: "Status", th_updated: "Updated",
+    stat_open: "Open requests", stat_confirmed: "Confirmed", stat_needs_attention: "Needs attention", stat_negotiating: "Negotiating",
+    new_title: "New vendor request", new_subtitle: "Draft and send a request to a single vendor.",
+    f_vendor_name: "Vendor name", f_contact_address: "Contact address", f_category: "Category",
+    f_description: "Description", f_dates: "Dates", f_quantity: "Quantity", f_budget_min: "Budget min", f_budget_max: "Budget max",
+    f_vendors: "Vendors",
+    f_channel: "Contact channel", channel_email: "email", channel_whatsapp: "WhatsApp",
+    vendors_title: "Vendor directory", vendors_subtitle: "Builds itself from usage — every vendor you've contacted, with a live confirm rate.",
+    th_channel: "Channel", th_category: "Category", th_requests: "Requests", th_confirm_rate: "Confirm rate",
+    vendors_empty: "No vendors yet — they're added automatically the first time you send a request.",
+    proposal_title: "Generate client proposal", proposal_subtitle: "Pick confirmed requests to include — pulls the actual agreed rates into a downloadable document.",
+    f_trip_title: "Trip title", f_client_name: "Client name (optional)", f_select_confirmed: "Confirmed requests to include",
+    btn_generate_proposal: "Generate & download", proposal_none_confirmed: "No confirmed requests yet — confirm at least one before generating a proposal.",
+    cat_accommodation: "accommodation", cat_transport: "transport", cat_activity: "activity",
+    btn_send_request: "Send request", btn_add_vendor: "+ Add vendor", btn_send_all: "Send to all vendors",
+    sourcing_title: "New competitive sourcing", sourcing_subtitle: "Send the same need to several vendors and compare responses.",
+    compare_title: "Compare sourcing responses", compare_subtitle: "See who's responded and how they rank on price.",
+    compare_none: "No sourcing requests yet.", compare_ranked: "Ranked by price", compare_no_confirmed: "No confirmed offers yet.",
+    compare_pending: "Still waiting on:",
+    how_title: "What's automated, what's you",
+    how_subtitle: "A clear line between what this platform does on its own and what still needs a person — nothing runs unsupervised where judgment actually matters.",
+    how_auto_heading: "Handled automatically", how_manual_heading: "Still needs you",
+    auto_1: "Drafting the first request to a vendor from the need you enter",
+    auto_2: "Parsing a vendor's reply into structured availability, rate, and terms",
+    auto_3: "Following up after silence, on a bounded schedule, so nothing goes quiet forever",
+    auto_4: "Counter-offering once a quote comes in above budget, up to a capped number of rounds",
+    auto_5: "Confirming a booking the moment terms are clearly acceptable",
+    auto_6: "Tracking hold expiry deadlines and flagging ones about to lapse",
+    auto_7: "Fanning one need out to several vendors and ranking confirmed offers by price",
+    auto_8: "Splitting a single reply that answers more than one line item at once",
+    auto_9: "Registering vendors in the directory automatically and tracking their real confirm rate",
+    auto_10: "Routing each outbound message to email or WhatsApp based on the vendor's channel",
+    manual_1: "Any reply that's ambiguous, partial, or a counter-offer the agent can't resolve on its own",
+    manual_2: "Deciding your actual walk-away price and negotiation rules — the defaults are placeholders",
+    manual_3: "Marking a confirmed hold as truly locked in once you've actually paid or booked",
+    manual_4: "Reopening a confirmed booking when a client detail changes after the fact",
+    manual_5: "Sending the message yourself if SMTP isn't connected — the draft is ready either way",
+    manual_6: "Choosing between two ranked offers in a sourcing comparison — price isn't the only factor",
+    manual_7: "Recording a WhatsApp reply yourself — there's no inbound polling for WhatsApp the way IMAP works for email",
+    manual_8: "Picking which confirmed requests go into a client proposal, and reviewing it before it's sent",
+    status_title: "System status", status_subtitle: "What's actually wired up versus running in mock mode.",
+    status_note: "Mock mode uses rule-based stand-ins for drafting and parsing so the platform runs without an API key. Set ANTHROPIC_API_KEY, SMTP_*, and IMAP_* environment variables to make dispatch and inbox polling real.",
+    llm_status: "LLM", llm_mock: "mock mode", llm_live: "live (Claude)",
+    smtp_status: "SMTP dispatch", imap_status: "IMAP poll", whatsapp_status: "WhatsApp dispatch", cfg_yes: "configured", cfg_no: "not configured",
+    modal_process_reply: "Process reply", modal_lock: "Mark locked in", modal_revise: "Revise (details changed)",
+    modal_paste_reply: "Paste vendor reply", modal_reply_ph: "Paste the vendor's email reply here...",
+    modal_what_changed: "What changed?", modal_new_qty: "New quantity (optional)", modal_reopen: "Reopen request",
+    alert_no_timeout: "No timeout actions.", alert_expiring: "Expiring holds:", alert_expired: "EXPIRED",
+    alert_hours_left: "h left", alert_no_replies: "No new replies.", alert_poll_off: "Inbox poll not configured — set IMAP_HOST/USER/PASSWORD to enable.",
+  },
+  ar: {
+    tagline: "تنسيق تلقائي مع الموردين لمشغلي الرحلات السياحية.",
+    nav_queue: "قائمة الطلبات", nav_new: "طلب جديد", nav_sourcing: "توريد جديد",
+    nav_compare: "مقارنة التوريد", nav_vendors: "دليل الموردين", nav_proposal: "إنشاء عرض", nav_how: "كيف يعمل النظام", nav_status: "حالة النظام",
+    lang_label: "اللغة",
+    queue_title: "الطلبات المفتوحة", queue_subtitle: "كل طلب مورد، حالته الحالية، وآخر تحديث له.",
+    queue_empty: "لا توجد طلبات بعد — أنشئ واحدًا من قسم طلب جديد.",
+    btn_run_check: "تشغيل الفحص (المهلة والعروض المنتهية)", btn_poll: "فحص البريد الوارد",
+    th_request: "الطلب", th_vendor: "المورد", th_need: "الاحتياج", th_status: "الحالة", th_updated: "آخر تحديث",
+    stat_open: "طلبات مفتوحة", stat_confirmed: "مؤكدة", stat_needs_attention: "تحتاج متابعة", stat_negotiating: "قيد التفاوض",
+    new_title: "طلب مورد جديد", new_subtitle: "صياغة وإرسال طلب إلى مورد واحد.",
+    f_vendor_name: "اسم المورد", f_contact_address: "عنوان التواصل", f_category: "الفئة",
+    f_description: "الوصف", f_dates: "التواريخ", f_quantity: "الكمية", f_budget_min: "الحد الأدنى للميزانية", f_budget_max: "الحد الأقصى للميزانية",
+    f_vendors: "الموردون",
+    f_channel: "قناة التواصل", channel_email: "بريد إلكتروني", channel_whatsapp: "واتساب",
+    vendors_title: "دليل الموردين", vendors_subtitle: "يُبنى تلقائيًا من الاستخدام — كل مورد تواصلت معه، مع نسبة تأكيد حية.",
+    th_channel: "القناة", th_category: "الفئة", th_requests: "الطلبات", th_confirm_rate: "نسبة التأكيد",
+    vendors_empty: "لا يوجد موردون بعد — تتم إضافتهم تلقائيًا عند إرسال أول طلب.",
+    proposal_title: "إنشاء عرض للعميل", proposal_subtitle: "اختر الطلبات المؤكدة لتضمينها — يسحب الأسعار المتفق عليها فعليًا إلى مستند قابل للتنزيل.",
+    f_trip_title: "عنوان الرحلة", f_client_name: "اسم العميل (اختياري)", f_select_confirmed: "الطلبات المؤكدة المراد تضمينها",
+    btn_generate_proposal: "إنشاء وتنزيل", proposal_none_confirmed: "لا توجد طلبات مؤكدة بعد — أكّد طلبًا واحدًا على الأقل قبل إنشاء عرض.",
+    cat_accommodation: "إقامة", cat_transport: "نقل", cat_activity: "نشاط",
+    btn_send_request: "إرسال الطلب", btn_add_vendor: "+ إضافة مورد", btn_send_all: "إرسال لجميع الموردين",
+    sourcing_title: "توريد تنافسي جديد", sourcing_subtitle: "أرسل نفس الاحتياج لعدة موردين وقارن الردود.",
+    compare_title: "مقارنة ردود التوريد", compare_subtitle: "شاهد من استجاب وترتيبهم حسب السعر.",
+    compare_none: "لا توجد طلبات توريد بعد.", compare_ranked: "الترتيب حسب السعر", compare_no_confirmed: "لا توجد عروض مؤكدة بعد.",
+    compare_pending: "في انتظار:",
+    how_title: "ما هو تلقائي، وما هو من مسؤوليتك",
+    how_subtitle: "خط واضح بين ما تقوم به المنصة تلقائيًا وما لا يزال يحتاج إلى شخص — لا شيء يعمل دون إشراف حيث يكون الحكم البشري مهمًا فعلاً.",
+    how_auto_heading: "يُنجز تلقائيًا", how_manual_heading: "لا يزال يحتاج إليك",
+    auto_1: "صياغة أول طلب لمورد بناءً على الاحتياج الذي تدخله",
+    auto_2: "تحليل رد المورد إلى بيانات منظمة عن التوفر والسعر والشروط",
+    auto_3: "المتابعة بعد الصمت، وفق جدول محدود، حتى لا يتوقف أي طلب دون رد",
+    auto_4: "تقديم عرض مقابل عندما يتجاوز السعر الميزانية، حتى عدد محدد من الجولات",
+    auto_5: "تأكيد الحجز فور أن تصبح الشروط مقبولة بوضوح",
+    auto_6: "تتبع مواعيد انتهاء العروض المحجوزة والتنبيه قبل انتهائها",
+    auto_7: "توزيع احتياج واحد على عدة موردين وترتيب العروض المؤكدة حسب السعر",
+    auto_8: "تقسيم رد واحد يجيب على أكثر من بند في آن واحد",
+    auto_9: "تسجيل الموردين في الدليل تلقائيًا وتتبع نسبة تأكيدهم الفعلية",
+    auto_10: "توجيه كل رسالة صادرة إلى البريد الإلكتروني أو واتساب حسب قناة المورد",
+    manual_1: "أي رد غامض أو جزئي أو عرض مقابل لا يستطيع النظام حله بمفرده",
+    manual_2: "تحديد السعر الأدنى الفعلي وقواعد التفاوض الخاصة بك — القيم الافتراضية مؤقتة فقط",
+    manual_3: "تأكيد أن الحجز أصبح نهائيًا فعليًا بعد الدفع أو الحجز الفعلي",
+    manual_4: "إعادة فتح حجز مؤكد عند تغيّر أحد تفاصيل العميل لاحقًا",
+    manual_5: "إرسال الرسالة بنفسك إذا لم يكن SMTP متصلاً — المسودة جاهزة في كل الأحوال",
+    manual_6: "الاختيار بين عرضين مرتبين في مقارنة التوريد — السعر ليس العامل الوحيد",
+    manual_7: "تسجيل رد واتساب بنفسك — لا يوجد فحص تلقائي للرسائل الواردة عبر واتساب كما هو الحال مع البريد عبر IMAP",
+    manual_8: "اختيار الطلبات المؤكدة التي تُدرج في عرض العميل، ومراجعته قبل إرساله",
+    status_title: "حالة النظام", status_subtitle: "ما هو متصل فعليًا مقابل ما يعمل في وضع المحاكاة.",
+    status_note: "يستخدم وضع المحاكاة بدائل قائمة على القواعد للصياغة والتحليل حتى تعمل المنصة دون مفتاح API. اضبط متغيرات ANTHROPIC_API_KEY وSMTP_* وIMAP_* لتفعيل الإرسال الفعلي وفحص البريد.",
+    llm_status: "نموذج اللغة", llm_mock: "وضع المحاكاة", llm_live: "مباشر (Claude)",
+    smtp_status: "إرسال SMTP", imap_status: "فحص IMAP", whatsapp_status: "إرسال واتساب", cfg_yes: "مُفعّل", cfg_no: "غير مُفعّل",
+    modal_process_reply: "معالجة الرد", modal_lock: "تأكيد الحجز النهائي", modal_revise: "تعديل (تغيّرت التفاصيل)",
+    modal_paste_reply: "الصق رد المورد", modal_reply_ph: "الصق رسالة رد المورد هنا...",
+    modal_what_changed: "ما الذي تغيّر؟", modal_new_qty: "الكمية الجديدة (اختياري)", modal_reopen: "إعادة فتح الطلب",
+    alert_no_timeout: "لا توجد إجراءات مهلة.", alert_expiring: "عروض على وشك الانتهاء:", alert_expired: "منتهية",
+    alert_hours_left: "ساعة متبقية", alert_no_replies: "لا توجد ردود جديدة.", alert_poll_off: "فحص البريد غير مُفعّل — اضبط IMAP_HOST/USER/PASSWORD للتفعيل.",
+  },
+  fr: {
+    tagline: "Coordination automatisée des fournisseurs pour voyagistes.",
+    nav_queue: "File d'attente", nav_new: "Nouvelle demande", nav_sourcing: "Nouveau sourcing",
+    nav_compare: "Comparer le sourcing", nav_vendors: "Répertoire fournisseurs", nav_proposal: "Générer une proposition", nav_how: "Fonctionnement", nav_status: "État du système",
+    lang_label: "Langue",
+    queue_title: "Demandes ouvertes", queue_subtitle: "Chaque demande fournisseur, son statut actuel, sa dernière mise à jour.",
+    queue_empty: "Aucune demande pour l'instant — créez-en une sous Nouvelle demande.",
+    btn_run_check: "Lancer la vérification (délais + offres expirantes)", btn_poll: "Vérifier la boîte mail",
+    th_request: "Demande", th_vendor: "Fournisseur", th_need: "Besoin", th_status: "Statut", th_updated: "Mis à jour",
+    stat_open: "Demandes ouvertes", stat_confirmed: "Confirmées", stat_needs_attention: "À traiter", stat_negotiating: "En négociation",
+    new_title: "Nouvelle demande fournisseur", new_subtitle: "Rédiger et envoyer une demande à un seul fournisseur.",
+    f_vendor_name: "Nom du fournisseur", f_contact_address: "Adresse de contact", f_category: "Catégorie",
+    f_description: "Description", f_dates: "Dates", f_quantity: "Quantité", f_budget_min: "Budget min", f_budget_max: "Budget max",
+    f_vendors: "Fournisseurs",
+    f_channel: "Canal de contact", channel_email: "e-mail", channel_whatsapp: "WhatsApp",
+    vendors_title: "Répertoire des fournisseurs", vendors_subtitle: "Se construit à partir de l'usage — chaque fournisseur contacté, avec un taux de confirmation en direct.",
+    th_channel: "Canal", th_category: "Catégorie", th_requests: "Demandes", th_confirm_rate: "Taux de confirmation",
+    vendors_empty: "Aucun fournisseur pour l'instant — ils sont ajoutés automatiquement dès votre première demande.",
+    proposal_title: "Générer une proposition client", proposal_subtitle: "Choisissez les demandes confirmées à inclure — récupère les tarifs réellement convenus dans un document téléchargeable.",
+    f_trip_title: "Titre du voyage", f_client_name: "Nom du client (facultatif)", f_select_confirmed: "Demandes confirmées à inclure",
+    btn_generate_proposal: "Générer et télécharger", proposal_none_confirmed: "Aucune demande confirmée pour l'instant — confirmez-en au moins une avant de générer une proposition.",
+    cat_accommodation: "hébergement", cat_transport: "transport", cat_activity: "activité",
+    btn_send_request: "Envoyer la demande", btn_add_vendor: "+ Ajouter un fournisseur", btn_send_all: "Envoyer à tous les fournisseurs",
+    sourcing_title: "Nouveau sourcing compétitif", sourcing_subtitle: "Envoyer le même besoin à plusieurs fournisseurs et comparer les réponses.",
+    compare_title: "Comparer les réponses de sourcing", compare_subtitle: "Voir qui a répondu et leur classement par prix.",
+    compare_none: "Aucune demande de sourcing pour l'instant.", compare_ranked: "Classement par prix", compare_no_confirmed: "Aucune offre confirmée pour l'instant.",
+    compare_pending: "En attente de :",
+    how_title: "Ce qui est automatisé, ce qui reste à vous",
+    how_subtitle: "Une frontière claire entre ce que la plateforme fait seule et ce qui nécessite encore une personne — rien ne fonctionne sans supervision là où le jugement humain compte vraiment.",
+    how_auto_heading: "Géré automatiquement", how_manual_heading: "Nécessite encore vous",
+    auto_1: "Rédaction de la première demande à un fournisseur à partir du besoin saisi",
+    auto_2: "Analyse de la réponse d'un fournisseur en disponibilité, tarif et conditions structurés",
+    auto_3: "Relance après silence, selon un calendrier limité, pour qu'aucune demande ne reste sans réponse",
+    auto_4: "Contre-offre automatique si un tarif dépasse le budget, jusqu'à un nombre limité de tours",
+    auto_5: "Confirmation de la réservation dès que les conditions sont clairement acceptables",
+    auto_6: "Suivi des délais d'expiration des offres retenues et alerte avant leur échéance",
+    auto_7: "Envoi d'un même besoin à plusieurs fournisseurs et classement des offres confirmées par prix",
+    auto_8: "Découpage d'une réponse unique répondant à plusieurs éléments à la fois",
+    auto_9: "Enregistrement automatique des fournisseurs dans le répertoire et suivi de leur taux de confirmation réel",
+    auto_10: "Acheminement de chaque message sortant vers l'e-mail ou WhatsApp selon le canal du fournisseur",
+    manual_1: "Toute réponse ambiguë, partielle, ou une contre-offre que l'agent ne peut résoudre seul",
+    manual_2: "Définir votre prix plancher réel et vos règles de négociation — les valeurs par défaut sont provisoires",
+    manual_3: "Confirmer qu'une offre retenue est réellement finalisée une fois payée ou réservée",
+    manual_4: "Rouvrir une réservation confirmée si un détail client change après coup",
+    manual_5: "Envoyer le message vous-même si le SMTP n'est pas connecté — le brouillon est prêt dans tous les cas",
+    manual_6: "Choisir entre deux offres classées dans une comparaison de sourcing — le prix n'est pas le seul critère",
+    manual_7: "Enregistrer vous-même une réponse WhatsApp — il n'existe pas d'équivalent IMAP pour vérifier les messages WhatsApp entrants",
+    manual_8: "Choisir quelles demandes confirmées figurent dans une proposition client, et la relire avant envoi",
+    status_title: "État du système", status_subtitle: "Ce qui est réellement connecté par rapport au mode simulation.",
+    status_note: "Le mode simulation utilise des substituts basés sur des règles pour la rédaction et l'analyse afin que la plateforme fonctionne sans clé API. Définissez ANTHROPIC_API_KEY, SMTP_* et IMAP_* pour activer l'envoi et la vérification réels.",
+    llm_status: "Modèle de langage", llm_mock: "mode simulation", llm_live: "en direct (Claude)",
+    smtp_status: "Envoi SMTP", imap_status: "Vérification IMAP", whatsapp_status: "Envoi WhatsApp", cfg_yes: "configuré", cfg_no: "non configuré",
+    modal_process_reply: "Traiter la réponse", modal_lock: "Marquer comme finalisé", modal_revise: "Modifier (détails changés)",
+    modal_paste_reply: "Coller la réponse du fournisseur", modal_reply_ph: "Collez ici l'e-mail de réponse du fournisseur...",
+    modal_what_changed: "Qu'est-ce qui a changé ?", modal_new_qty: "Nouvelle quantité (facultatif)", modal_reopen: "Rouvrir la demande",
+    alert_no_timeout: "Aucune action de délai.", alert_expiring: "Offres bientôt expirées :", alert_expired: "EXPIRÉE",
+    alert_hours_left: "h restantes", alert_no_replies: "Aucune nouvelle réponse.", alert_poll_off: "Vérification de la boîte mail non configurée — définissez IMAP_HOST/USER/PASSWORD pour l'activer.",
+  },
+  sw: {
+    tagline: "Uratibu wa kiotomatiki wa wauzaji kwa waendeshaji watalii.",
+    nav_queue: "Foleni", nav_new: "Ombi Jipya", nav_sourcing: "Utafutaji Mpya",
+    nav_compare: "Linganisha Utafutaji", nav_vendors: "Orodha ya Wauzaji", nav_proposal: "Tengeneza Pendekezo", nav_how: "Jinsi Inavyofanya Kazi", nav_status: "Hali ya Mfumo",
+    lang_label: "Lugha",
+    queue_title: "Maombi yaliyo wazi", queue_subtitle: "Kila ombi la muuzaji, hali yake ya sasa, na sasisho la mwisho.",
+    queue_empty: "Hakuna maombi bado — tengeneza moja chini ya Ombi Jipya.",
+    btn_run_check: "Fanya ukaguzi (muda na ofa zinazokaribia kuisha)", btn_poll: "Kagua barua pepe",
+    th_request: "Ombi", th_vendor: "Muuzaji", th_need: "Hitaji", th_status: "Hali", th_updated: "Ilisasishwa",
+    stat_open: "Maombi yaliyo wazi", stat_confirmed: "Yamethibitishwa", stat_needs_attention: "Yanahitaji uangalizi", stat_negotiating: "Yanajadiliwa",
+    new_title: "Ombi jipya la muuzaji", new_subtitle: "Andika na tuma ombi kwa muuzaji mmoja.",
+    f_vendor_name: "Jina la muuzaji", f_contact_address: "Anwani ya mawasiliano", f_category: "Aina",
+    f_description: "Maelezo", f_dates: "Tarehe", f_quantity: "Kiasi", f_budget_min: "Bajeti ya chini", f_budget_max: "Bajeti ya juu",
+    f_vendors: "Wauzaji",
+    f_channel: "Njia ya mawasiliano", channel_email: "barua pepe", channel_whatsapp: "WhatsApp",
+    vendors_title: "Orodha ya wauzaji", vendors_subtitle: "Inajijenga kutoka kwa matumizi — kila muuzaji uliyewasiliana naye, na kiwango cha uthibitisho cha moja kwa moja.",
+    th_channel: "Njia", th_category: "Aina", th_requests: "Maombi", th_confirm_rate: "Kiwango cha uthibitisho",
+    vendors_empty: "Hakuna wauzaji bado — wanaongezwa kiotomatiki mara ya kwanza unapotuma ombi.",
+    proposal_title: "Tengeneza pendekezo la mteja", proposal_subtitle: "Chagua maombi yaliyothibitishwa ya kujumuisha — huchukua bei zilizokubaliwa kikamilifu kwenye hati inayoweza kupakuliwa.",
+    f_trip_title: "Kichwa cha safari", f_client_name: "Jina la mteja (si lazima)", f_select_confirmed: "Maombi yaliyothibitishwa ya kujumuisha",
+    btn_generate_proposal: "Tengeneza na upakue", proposal_none_confirmed: "Hakuna maombi yaliyothibitishwa bado — thibitisha angalau moja kabla ya kutengeneza pendekezo.",
+    cat_accommodation: "malazi", cat_transport: "usafiri", cat_activity: "shughuli",
+    btn_send_request: "Tuma ombi", btn_add_vendor: "+ Ongeza muuzaji", btn_send_all: "Tuma kwa wauzaji wote",
+    sourcing_title: "Utafutaji mpya wa ushindani", sourcing_subtitle: "Tuma hitaji lile lile kwa wauzaji kadhaa na ulinganishe majibu.",
+    compare_title: "Linganisha majibu ya utafutaji", compare_subtitle: "Ona ni nani amejibu na jinsi wanavyopangwa kwa bei.",
+    compare_none: "Hakuna maombi ya utafutaji bado.", compare_ranked: "Yamepangwa kwa bei", compare_no_confirmed: "Hakuna ofa zilizothibitishwa bado.",
+    compare_pending: "Bado inasubiri:",
+    how_title: "Kinachofanywa kiotomatiki, na kinachohitaji wewe",
+    how_subtitle: "Mstari wazi kati ya kile mfumo unafanya wenyewe na kile bado kinachohitaji mtu — hakuna kinachofanyika bila usimamizi pale uamuzi wa kibinadamu unapohitajika kweli.",
+    how_auto_heading: "Kinachoshughulikiwa kiotomatiki", how_manual_heading: "Bado kinahitaji wewe",
+    auto_1: "Kuandika ombi la kwanza kwa muuzaji kutoka kwa hitaji ulilolijaza",
+    auto_2: "Kuchambua jibu la muuzaji kuwa upatikanaji, bei, na masharti yaliyopangwa",
+    auto_3: "Kufuatilia baada ya ukimya, kwa ratiba yenye kikomo, ili hakuna ombi linalobaki bila jibu milele",
+    auto_4: "Kutoa ofa mbadala pale bei inapozidi bajeti, hadi idadi maalum ya raundi",
+    auto_5: "Kuthibitisha uhifadhi mara masharti yanapokuwa yanakubalika wazi",
+    auto_6: "Kufuatilia muda wa mwisho wa ofa zilizoshikiliwa na kuonya zinapokaribia kuisha",
+    auto_7: "Kusambaza hitaji moja kwa wauzaji kadhaa na kupanga ofa zilizothibitishwa kwa bei",
+    auto_8: "Kugawanya jibu moja linalojibu vipengele zaidi ya kimoja kwa wakati mmoja",
+    auto_9: "Kusajili wauzaji kwenye orodha kiotomatiki na kufuatilia kiwango chao halisi cha uthibitisho",
+    auto_10: "Kuelekeza kila ujumbe unaotoka kwenda barua pepe au WhatsApp kulingana na njia ya muuzaji",
+    manual_1: "Jibu lolote lisilo wazi, la sehemu, au ofa mbadala ambayo mfumo hauwezi kutatua wenyewe",
+    manual_2: "Kuamua bei yako halisi ya chini na sheria za majadiliano — chaguo-msingi ni za muda tu",
+    manual_3: "Kuthibitisha kuwa uhifadhi umekamilika kikamilifu baada ya kulipa au kuhifadhi kwa uhalisia",
+    manual_4: "Kufungua tena uhifadhi ulioidhinishwa pale maelezo ya mteja yanapobadilika baadaye",
+    manual_5: "Kutuma ujumbe wewe mwenyewe endapo SMTP haijaunganishwa — rasimu iko tayari kwa hali zote",
+    manual_6: "Kuchagua kati ya ofa mbili zilizopangwa katika ulinganisho wa utafutaji — bei siyo kigezo pekee",
+    manual_7: "Kurekodi jibu la WhatsApp wewe mwenyewe — hakuna ukaguzi wa kiotomatiki wa ujumbe unaoingia wa WhatsApp kama ilivyo kwa barua pepe kupitia IMAP",
+    manual_8: "Kuchagua ni maombi gani yaliyothibitishwa yataingizwa kwenye pendekezo la mteja, na kulikagua kabla ya kulituma",
+    status_title: "Hali ya mfumo", status_subtitle: "Kile ambacho kimeunganishwa kikamilifu dhidi ya kinachoendeshwa katika hali ya kuiga.",
+    status_note: "Hali ya kuiga hutumia mbadala zenye kanuni za kuandika na kuchambua ili mfumo ufanye kazi bila ufunguo wa API. Weka ANTHROPIC_API_KEY, SMTP_*, na IMAP_* ili kuwezesha utumaji na ukaguzi wa barua pepe halisi.",
+    llm_status: "Kielelezo cha lugha", llm_mock: "hali ya kuiga", llm_live: "moja kwa moja (Claude)",
+    smtp_status: "Utumaji wa SMTP", imap_status: "Ukaguzi wa IMAP", whatsapp_status: "Utumaji wa WhatsApp", cfg_yes: "kimewekwa", cfg_no: "hakijawekwa",
+    modal_process_reply: "Shughulikia jibu", modal_lock: "Weka alama kama limekamilika", modal_revise: "Rekebisha (maelezo yamebadilika)",
+    modal_paste_reply: "Bandika jibu la muuzaji", modal_reply_ph: "Bandika barua pepe ya jibu la muuzaji hapa...",
+    modal_what_changed: "Nini kimebadilika?", modal_new_qty: "Kiasi kipya (si lazima)", modal_reopen: "Fungua tena ombi",
+    alert_no_timeout: "Hakuna vitendo vya muda.", alert_expiring: "Ofa zinazokaribia kuisha:", alert_expired: "IMEISHA",
+    alert_hours_left: "saa zimebaki", alert_no_replies: "Hakuna majibu mapya.", alert_poll_off: "Ukaguzi wa barua pepe haujawekwa — weka IMAP_HOST/USER/PASSWORD kuwezesha.",
+  },
+  hi: {
+    tagline: "टूर ऑपरेटरों के लिए स्वचालित वेंडर समन्वय।",
+    nav_queue: "कतार", nav_new: "नया अनुरोध", nav_sourcing: "नई सोर्सिंग",
+    nav_compare: "सोर्सिंग तुलना करें", nav_vendors: "वेंडर निर्देशिका", nav_proposal: "प्रस्ताव तैयार करें", nav_how: "यह कैसे काम करता है", nav_status: "सिस्टम स्थिति",
+    lang_label: "भाषा",
+    queue_title: "खुले अनुरोध", queue_subtitle: "हर वेंडर अनुरोध, उसकी वर्तमान स्थिति, अंतिम अपडेट।",
+    queue_empty: "अभी तक कोई अनुरोध नहीं — नया अनुरोध सेक्शन में एक बनाएं।",
+    btn_run_check: "जांच चलाएं (समयसीमा + समाप्त होने वाली होल्ड्स)", btn_poll: "इनबॉक्स जांचें",
+    th_request: "अनुरोध", th_vendor: "वेंडर", th_need: "आवश्यकता", th_status: "स्थिति", th_updated: "अपडेट किया गया",
+    stat_open: "खुले अनुरोध", stat_confirmed: "पुष्टि किए गए", stat_needs_attention: "ध्यान चाहिए", stat_negotiating: "बातचीत जारी",
+    new_title: "नया वेंडर अनुरोध", new_subtitle: "एक वेंडर को अनुरोध तैयार करें और भेजें।",
+    f_vendor_name: "वेंडर का नाम", f_contact_address: "संपर्क पता", f_category: "श्रेणी",
+    f_description: "विवरण", f_dates: "तारीखें", f_quantity: "मात्रा", f_budget_min: "न्यूनतम बजट", f_budget_max: "अधिकतम बजट",
+    f_vendors: "वेंडर",
+    f_channel: "संपर्क माध्यम", channel_email: "ईमेल", channel_whatsapp: "व्हाट्सएप",
+    vendors_title: "वेंडर निर्देशिका", vendors_subtitle: "उपयोग से खुद-ब-खुद बनती है — हर वह वेंडर जिससे आपने संपर्क किया, लाइव पुष्टि दर के साथ।",
+    th_channel: "माध्यम", th_category: "श्रेणी", th_requests: "अनुरोध", th_confirm_rate: "पुष्टि दर",
+    vendors_empty: "अभी तक कोई वेंडर नहीं — जब आप पहला अनुरोध भेजते हैं तो वे स्वतः जुड़ जाते हैं।",
+    proposal_title: "ग्राहक प्रस्ताव तैयार करें", proposal_subtitle: "शामिल करने के लिए पुष्टि किए गए अनुरोध चुनें — वास्तविक सहमत दरों को डाउनलोड करने योग्य दस्तावेज़ में लाता है।",
+    f_trip_title: "यात्रा शीर्षक", f_client_name: "ग्राहक का नाम (वैकल्पिक)", f_select_confirmed: "शामिल करने के लिए पुष्टि किए गए अनुरोध",
+    btn_generate_proposal: "तैयार करें और डाउनलोड करें", proposal_none_confirmed: "अभी तक कोई पुष्टि किया गया अनुरोध नहीं — प्रस्ताव बनाने से पहले कम से कम एक की पुष्टि करें।",
+    cat_accommodation: "आवास", cat_transport: "परिवहन", cat_activity: "गतिविधि",
+    btn_send_request: "अनुरोध भेजें", btn_add_vendor: "+ वेंडर जोड़ें", btn_send_all: "सभी वेंडरों को भेजें",
+    sourcing_title: "नई प्रतिस्पर्धी सोर्सिंग", sourcing_subtitle: "एक ही आवश्यकता कई वेंडरों को भेजें और जवाबों की तुलना करें।",
+    compare_title: "सोर्सिंग प्रतिक्रियाओं की तुलना करें", compare_subtitle: "देखें किसने जवाब दिया और कीमत के अनुसार क्रम।",
+    compare_none: "अभी तक कोई सोर्सिंग अनुरोध नहीं।", compare_ranked: "कीमत के अनुसार क्रमबद्ध", compare_no_confirmed: "अभी तक कोई पुष्टि की गई ऑफर नहीं।",
+    compare_pending: "अभी भी प्रतीक्षा में:",
+    how_title: "क्या स्वचालित है, क्या आपके ऊपर है",
+    how_subtitle: "यह प्लेटफ़ॉर्म स्वयं क्या करता है और अभी भी किसी व्यक्ति की ज़रूरत कहाँ है, इसके बीच स्पष्ट रेखा — जहाँ वास्तव में निर्णय मायने रखता है, वहाँ कुछ भी बिना निगरानी के नहीं चलता।",
+    how_auto_heading: "स्वचालित रूप से संभाला गया", how_manual_heading: "अभी भी आपकी ज़रूरत है",
+    auto_1: "आपके द्वारा दर्ज की गई आवश्यकता से वेंडर को पहला अनुरोध तैयार करना",
+    auto_2: "वेंडर के जवाब को संरचित उपलब्धता, दर और शर्तों में बदलना",
+    auto_3: "चुप्पी के बाद एक सीमित समय-सारणी पर फॉलो-अप करना, ताकि कोई अनुरोध हमेशा के लिए रुका न रहे",
+    auto_4: "बजट से अधिक कोटेशन आने पर काउंटर-ऑफर देना, एक सीमित राउंड तक",
+    auto_5: "शर्तें स्पष्ट रूप से स्वीकार्य होते ही बुकिंग की पुष्टि करना",
+    auto_6: "होल्ड की समाप्ति समय-सीमाओं को ट्रैक करना और समाप्त होने वाली को चिह्नित करना",
+    auto_7: "एक आवश्यकता को कई वेंडरों तक भेजना और पुष्टि किए गए ऑफ़र को कीमत के अनुसार क्रमबद्ध करना",
+    auto_8: "एक ही जवाब को अलग करना जो एक से अधिक वस्तुओं का उत्तर देता है",
+    auto_9: "वेंडरों को निर्देशिका में स्वतः पंजीकृत करना और उनकी वास्तविक पुष्टि दर को ट्रैक करना",
+    auto_10: "वेंडर के माध्यम के आधार पर हर बाहर जाने वाला संदेश ईमेल या व्हाट्सएप पर भेजना",
+    manual_1: "कोई भी जवाब जो अस्पष्ट, आंशिक हो, या ऐसा काउंटर-ऑफर जिसे एजेंट खुद हल न कर सके",
+    manual_2: "आपकी वास्तविक न्यूनतम कीमत और बातचीत के नियम तय करना — डिफ़ॉल्ट केवल अस्थायी हैं",
+    manual_3: "भुगतान या वास्तविक बुकिंग के बाद होल्ड को सही मायने में अंतिम रूप देना",
+    manual_4: "बाद में ग्राहक विवरण बदलने पर पुष्टि की गई बुकिंग को फिर से खोलना",
+    manual_5: "अगर SMTP जुड़ा नहीं है तो संदेश खुद भेजना — मसौदा हर हाल में तैयार रहता है",
+    manual_6: "सोर्सिंग तुलना में दो क्रमबद्ध ऑफ़रों के बीच चुनाव करना — कीमत ही एकमात्र कारक नहीं है",
+    manual_7: "व्हाट्सएप जवाब खुद दर्ज करना — ईमेल के लिए IMAP जैसा कोई स्वचालित इनबॉक्स जांच व्हाट्सएप के लिए मौजूद नहीं है",
+    manual_8: "ग्राहक प्रस्ताव में कौन से पुष्टि किए गए अनुरोध शामिल करने हैं यह चुनना, और भेजने से पहले उसकी समीक्षा करना",
+    status_title: "सिस्टम स्थिति", status_subtitle: "वास्तव में क्या जुड़ा है बनाम मॉक मोड में क्या चल रहा है।",
+    status_note: "मॉक मोड ड्राफ्टिंग और पार्सिंग के लिए नियम-आधारित विकल्पों का उपयोग करता है ताकि प्लेटफ़ॉर्म बिना API कुंजी के चल सके। वास्तविक भेजने और इनबॉक्स जांच के लिए ANTHROPIC_API_KEY, SMTP_*, और IMAP_* सेट करें।",
+    llm_status: "भाषा मॉडल", llm_mock: "मॉक मोड", llm_live: "लाइव (Claude)",
+    smtp_status: "SMTP भेजना", imap_status: "IMAP जांच", whatsapp_status: "व्हाट्सएप भेजना", cfg_yes: "कॉन्फ़िगर किया गया", cfg_no: "कॉन्फ़िगर नहीं किया गया",
+    modal_process_reply: "जवाब संसाधित करें", modal_lock: "अंतिम रूप से चिह्नित करें", modal_revise: "संशोधित करें (विवरण बदल गया)",
+    modal_paste_reply: "वेंडर का जवाब पेस्ट करें", modal_reply_ph: "वेंडर का ईमेल जवाब यहाँ पेस्ट करें...",
+    modal_what_changed: "क्या बदला?", modal_new_qty: "नई मात्रा (वैकल्पिक)", modal_reopen: "अनुरोध फिर से खोलें",
+    alert_no_timeout: "कोई समयसीमा कार्रवाई नहीं।", alert_expiring: "समाप्त होने वाली होल्ड्स:", alert_expired: "समाप्त",
+    alert_hours_left: "घंटे शेष", alert_no_replies: "कोई नया जवाब नहीं।", alert_poll_off: "इनबॉक्स जांच कॉन्फ़िगर नहीं है — सक्षम करने के लिए IMAP_HOST/USER/PASSWORD सेट करें।",
+  },
+};
+const RTL_LANGS = ["ar"];
+let currentLang = "en";
+function t(key) { return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key; }
+function esc(str) {
+  if (str === null || str === undefined) return "";
+  const div = document.createElement("div");
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+function toast(message, type = "info", duration = 5000) {
+  const stack = document.getElementById("toast-stack");
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  stack.appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity 0.2s"; setTimeout(() => el.remove(), 200); }, duration);
+}
+function withLoading(btn, fn) {
+  return async (...args) => {
+    if (btn) btn.classList.add("loading");
+    try {
+      await fn(...args);
+    } catch (e) {
+      toast(String(e.message || e), "error");
+    } finally {
+      if (btn) btn.classList.remove("loading");
+    }
+  };
+}
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById("lang-picker").value = lang;
+  const isRtl = RTL_LANGS.includes(lang);
+  document.body.setAttribute("dir", isRtl ? "rtl" : "ltr");
+  document.documentElement.setAttribute("dir", isRtl ? "rtl" : "ltr");
+  document.documentElement.setAttribute("lang", lang);
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  loadQueue();
+  if (document.getElementById("panel-compare").classList.contains("active")) loadCompare();
+  if (document.getElementById("panel-status").classList.contains("active")) loadStatus();
+}
+const API = "";
+let currentRequestId = null;
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("panel-" + btn.dataset.panel).classList.add("active");
+    if (btn.dataset.panel === "queue") loadQueue();
+    if (btn.dataset.panel === "compare") loadSourcingList();
+    if (btn.dataset.panel === "status") loadStatus();
+    if (btn.dataset.panel === "vendors") loadVendors();
+    if (btn.dataset.panel === "proposal") loadProposalChecklist();
+  });
+});
+function statusPill(status) {
+  return `<span class="pill pill-${status}">${status.replace(/_/g, " ")}</span>`;
+}
+function renderStats(details) {
+  const counts = { total: details.length, confirmed: 0, attention: 0, negotiating: 0 };
+  details.forEach(d => {
+    if (d.status === "confirmed") counts.confirmed++;
+    if (d.status === "escalated") counts.attention++;
+    if (d.status === "negotiating") counts.negotiating++;
+  });
+  document.getElementById("stats-strip").innerHTML = `
+    <div class="stat-card"><div class="num">${counts.total}</div><div class="label">${t("stat_open")}</div></div>
+    <div class="stat-card accent-success"><div class="num">${counts.confirmed}</div><div class="label">${t("stat_confirmed")}</div></div>
+    <div class="stat-card accent-danger"><div class="num">${counts.attention}</div><div class="label">${t("stat_needs_attention")}</div></div>
+    <div class="stat-card accent-warn"><div class="num">${counts.negotiating}</div><div class="label">${t("stat_negotiating")}</div></div>
+  `;
+}
+async function loadQueue() {
+  const res = await fetch(API + "/api/requests");
+  const rows = await res.json();
+  const body = document.getElementById("queue-body");
+  const empty = document.getElementById("queue-empty");
+  if (rows.length === 0) { body.innerHTML = ""; empty.style.display = "block"; renderStats([]); return; }
+  empty.style.display = "none";
+  const details = await Promise.all(rows.map(r => fetch(API + "/api/requests/" + r.request_id).then(x => x.json())));
+  renderStats(details);
+  const updatedMap = {};
+  rows.forEach(r => updatedMap[r.request_id] = r.updated_at);
+  body.innerHTML = details.map(d => `
+    <tr class="row" onclick="openRequest('${esc(d.request_id)}')">
+      <td class="mono">${esc(d.request_id)}</td>
+      <td>${esc(d.vendor.name)}</td>
+      <td>${esc(d.need.description)}</td>
+      <td>${statusPill(d.status)}</td>
+      <td class="mono">${esc((updatedMap[d.request_id] || "").slice(0,16))}</td>
+    </tr>
+  `).join("");
+}
+async function openRequest(id) {
+  currentRequestId = id;
+  const res = await fetch(API + "/api/requests/" + id);
+  const d = await res.json();
+  const messages = d.message_history.map(m => `
+    <div class="msg ${m.direction}"><div class="dir">${esc(m.direction)}</div>${esc(m.content)}</div>
+  `).join("");
+  const escalation = d.escalation_reason ? `<p style="color:var(--danger); font-size:13px;">${esc(d.escalation_reason)}</p>` : "";
+  document.getElementById("modal-content").innerHTML = `
+    <h2>${esc(d.request_id)}</h2>
+    <div class="meta">${esc(d.vendor.name)} — ${esc(d.need.description)} (${esc(d.need.dates)}) ${statusPill(d.status)}</div>
+    ${escalation}
+    ${messages}
+    <div class="modal-actions">
+      <label>${t("modal_paste_reply")}</label>
+      <textarea id="reply-text" placeholder="${t('modal_reply_ph')}"></textarea>
+      <button class="primary" onclick="submitReply()">${t("modal_process_reply")}</button>
+      <div style="margin-top:10px;">
+        <button class="secondary" onclick="lockRequest()">${t("modal_lock")}</button>
+        <button class="secondary" onclick="showReviseForm()">${t("modal_revise")}</button>
+      </div>
+      <div id="revise-form" style="display:none; margin-top:12px;">
+        <label>${t("modal_what_changed")}</label><input id="revise-change" placeholder="group size reduced from 15 to 10">
+        <label>${t("modal_new_qty")}</label><input id="revise-qty" type="number">
+        <button class="primary" onclick="submitRevise()">${t("modal_reopen")}</button>
+      </div>
+    </div>
+  `;
+  document.getElementById("modal-backdrop").classList.add("active");
+}
+function closeModal() { document.getElementById("modal-backdrop").classList.remove("active"); }
+async function submitReply() {
+  const text = document.getElementById("reply-text").value;
+  if (!text.trim()) return;
+  try {
+    const res = await fetch(API + "/api/requests/" + currentRequestId + "/reply", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({reply_text: text})
+    });
+    if (!res.ok) { toast((await res.json()).detail || "Failed to process reply.", "error"); return; }
+    const updated = await res.json();
+    toast(`${currentRequestId} → ${updated.status.replace(/_/g," ")}`, "success");
+    closeModal(); loadQueue();
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+async function lockRequest() {
+  try {
+    const res = await fetch(API + "/api/requests/" + currentRequestId + "/lock", {method: "POST"});
+    if (!res.ok) { toast("Failed to lock request.", "error"); return; }
+    toast(`${currentRequestId} marked as locked in.`, "success");
+    closeModal(); loadQueue();
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+function showReviseForm() { document.getElementById("revise-form").style.display = "block"; }
+async function submitRevise() {
+  const change = document.getElementById("revise-change").value;
+  const qty = document.getElementById("revise-qty").value;
+  if (!change.trim()) { toast("Describe what changed before reopening.", "warn"); return; }
+  const body = {change_description: change};
+  if (qty) body.new_quantity = parseInt(qty);
+  try {
+    const res = await fetch(API + "/api/requests/" + currentRequestId + "/revise", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+    });
+    if (!res.ok) { toast((await res.json()).detail || "Failed to reopen request.", "error"); return; }
+    toast(`${currentRequestId} reopened for revision.`, "success");
+    closeModal(); loadQueue();
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+async function createRequest() {
+  const vendorName = val("nr-vendor-name").trim();
+  const vendorAddress = val("nr-vendor-address").trim();
+  const description = val("nr-description").trim();
+  const dates = val("nr-dates").trim();
+  if (!vendorName || !vendorAddress || !description || !dates) {
+    toast("Vendor name, contact address, description, and dates are required.", "warn");
+    return;
+  }
+  const body = {
+    vendor: {name: vendorName, contact_channel: val("nr-vendor-channel"), contact_address: vendorAddress},
+    need: {
+      category: val("nr-category"), description: description, dates: dates,
+      quantity: intOrNull("nr-quantity"), budget_min: floatOrNull("nr-budget-min"), budget_max: floatOrNull("nr-budget-max")
+    }
+  };
+  try {
+    const res = await fetch(API + "/api/requests", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    if (!res.ok) { toast((await res.json()).detail || "Failed to create request.", "error"); return; }
+    const created = await res.json();
+    ["nr-vendor-name","nr-vendor-address","nr-description","nr-dates","nr-quantity","nr-budget-min","nr-budget-max"].forEach(id => document.getElementById(id).value = "");
+    toast(`${created.request_id} sent to ${esc(vendorName)}.`, "success");
+    document.querySelector('[data-panel="queue"]').click();
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+function val(id) { return document.getElementById(id).value; }
+function intOrNull(id) { const v = val(id); return v ? parseInt(v) : null; }
+function floatOrNull(id) { const v = val(id); return v ? parseFloat(v) : null; }
+function addVendorRow() {
+  const div = document.createElement("div");
+  div.className = "vendor-row";
+  div.innerHTML = `<input placeholder="Vendor name" class="v-name"><select class="v-channel"><option value="email">email</option><option value="whatsapp">WhatsApp</option></select><input placeholder="Contact address" class="v-address"><button onclick="this.parentElement.remove()">&times;</button>`;
+  document.getElementById("vendor-rows").appendChild(div);
+}
+addVendorRow(); addVendorRow();
+function updateAddressPlaceholder(prefix) {
+  const channel = document.getElementById(prefix + "-vendor-channel").value;
+  document.getElementById(prefix + "-vendor-address").placeholder = channel === "whatsapp" ? "+255712345678" : "amara@example.com";
+}
+async function createSourcing() {
+  const vendors = [...document.querySelectorAll(".vendor-row")].map(row => ({
+    name: row.querySelector(".v-name").value.trim(),
+    contact_channel: row.querySelector(".v-channel").value,
+    contact_address: row.querySelector(".v-address").value.trim()
+  })).filter(v => v.name && v.contact_address);
+  const description = val("ns-description").trim();
+  const dates = val("ns-dates").trim();
+  if (!description || !dates) { toast("Description and dates are required.", "warn"); return; }
+  if (vendors.length < 2) { toast("Add at least 2 vendors for competitive sourcing.", "warn"); return; }
+  const body = {
+    need: {
+      category: val("ns-category"), description: description, dates: dates,
+      quantity: intOrNull("ns-quantity"), budget_min: floatOrNull("ns-budget-min"), budget_max: floatOrNull("ns-budget-max")
+    },
+    vendors: vendors
+  };
+  try {
+    const res = await fetch(API + "/api/sourcing", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    if (!res.ok) { toast((await res.json()).detail || "Failed to create sourcing request.", "error"); return; }
+    const created = await res.json();
+    toast(`${created.sourcing_id} sent to ${vendors.length} vendors.`, "success");
+    document.querySelector('[data-panel="compare"]').click();
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+async function loadSourcingList() {
+  const res = await fetch(API + "/api/sourcing");
+  const rows = await res.json();
+  const picker = document.getElementById("sourcing-picker");
+  picker.innerHTML = rows.map(r => `<option value="${esc(r.sourcing_id)}">${esc(r.sourcing_id)}</option>`).join("");
+  if (rows.length) loadCompare();
+  else document.getElementById("compare-results").innerHTML = `<div class="empty">${t("compare_none")}</div>`;
+}
+async function loadCompare() {
+  const id = document.getElementById("sourcing-picker").value;
+  if (!id) return;
+  const res = await fetch(API + "/api/sourcing/" + id + "/compare");
+  const d = await res.json();
+  const rowsHtml = d.all_vendors.map(v => `
+    <tr>
+      <td>${esc(v.vendor)}</td>
+      <td>${statusPill(v.status)}</td>
+      <td>${v.rate !== null ? "$" + esc(v.rate) : "—"}</td>
+      <td>${v.available === null ? "—" : esc(v.available)}</td>
+      <td>${esc(v.alternative_offer || "")}</td>
+    </tr>
+  `).join("");
+  const ranked = d.confirmed_ranked_by_price.map((v, i) => `<li>${i+1}. ${esc(v.vendor)} — $${esc(v.rate)}</li>`).join("");
+  document.getElementById("compare-results").innerHTML = `
+    <p class="subtitle">${esc(d.need.description)} (${esc(d.need.dates)})</p>
+    <table>
+      <thead><tr><th>${t("th_vendor")}</th><th>${t("th_status")}</th><th>Rate</th><th>Available</th><th>Notes</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <h2 style="margin-top:24px;">${t("compare_ranked")}</h2>
+    ${ranked ? `<ol style="padding-left:20px; font-size:13.5px;">${ranked}</ol>` : `<p class="subtitle">${t("compare_no_confirmed")}</p>`}
+    ${d.still_pending.length ? `<p class="subtitle">${t("compare_pending")} ${esc(d.still_pending.join(", "))}</p>` : ""}
+  `;
+}
+async function runCheck() {
+  try {
+    const res = await fetch(API + "/api/check", {method: "POST"});
+    if (!res.ok) { toast("Check failed — see server log.", "error"); return; }
+    const d = await res.json();
+    const msg = d.timeout_checks.map(c => `${c.request_id}: ${c.before} -> ${c.after}`).join("\n") || t("alert_no_timeout");
+    toast(msg, d.timeout_checks.length ? "info" : "success");
+    if (d.expiring_holds.length) {
+      const holdMsg = t("alert_expiring") + "\n" + d.expiring_holds.map(h => `${h.request_id} (${h.vendor}): ${h.already_expired ? t("alert_expired") : h.hours_left.toFixed(1) + t("alert_hours_left")}`).join("\n");
+      toast(holdMsg, "warn", 8000);
+    }
+    loadQueue();
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+async function runPoll() {
+  try {
+    const res = await fetch(API + "/api/poll", {method: "POST"});
+    if (!res.ok) { toast("Poll failed — see server log.", "error"); return; }
+    const d = await res.json();
+    if (!d.configured) { toast(t("alert_poll_off"), "warn"); return; }
+    toast(d.processed.length ? d.processed.map(p => `${p.request_id}: ${p.status}`).join("\n") : t("alert_no_replies"), d.processed.length ? "info" : "success");
+    loadQueue();
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+async function loadStatus() {
+  const res = await fetch(API + "/api/status");
+  const d = await res.json();
+  const strip = document.getElementById("status-strip");
+  strip.innerHTML = `
+    <div class="status-chip"><span class="dot ${d.mock_llm_mode ? 'dot-off' : 'dot-on'}"></span>${t("llm_status")}: ${d.mock_llm_mode ? t("llm_mock") : t("llm_live")}</div>
+    <div class="status-chip"><span class="dot ${d.dispatch_configured ? 'dot-on' : 'dot-off'}"></span>${t("smtp_status")}: ${d.dispatch_configured ? t("cfg_yes") : t("cfg_no")}</div>
+    <div class="status-chip"><span class="dot ${d.inbox_poll_configured ? 'dot-on' : 'dot-off'}"></span>${t("imap_status")}: ${d.inbox_poll_configured ? t("cfg_yes") : t("cfg_no")}</div>
+    <div class="status-chip"><span class="dot ${d.whatsapp_configured ? 'dot-on' : 'dot-off'}"></span>${t("whatsapp_status")}: ${d.whatsapp_configured ? t("cfg_yes") : t("cfg_no")}</div>
+  `;
+}
+async function loadVendors() {
+  const res = await fetch(API + "/api/vendors");
+  const vendors = await res.json();
+  const body = document.getElementById("vendors-body");
+  const empty = document.getElementById("vendors-empty");
+  if (vendors.length === 0) { body.innerHTML = ""; empty.style.display = "block"; return; }
+  empty.style.display = "none";
+  body.innerHTML = vendors.map(v => `
+    <tr>
+      <td>${esc(v.name)}</td>
+      <td>${esc(v.contact_channel)}</td>
+      <td>${esc(v.category || "—")}</td>
+      <td>${v.total_requests}</td>
+      <td>${v.confirm_rate !== null ? Math.round(v.confirm_rate * 100) + "%" : "—"}</td>
+      <td class="mono">${esc((v.last_used_at || "").slice(0,16))}</td>
+    </tr>
+  `).join("");
+}
+async function loadProposalChecklist() {
+  const res = await fetch(API + "/api/requests");
+  const rows = await res.json();
+  const details = await Promise.all(rows.map(r => fetch(API + "/api/requests/" + r.request_id).then(x => x.json())));
+  const confirmed = details.filter(d => d.status === "confirmed");
+  const list = document.getElementById("proposal-checklist");
+  if (confirmed.length === 0) {
+    list.innerHTML = `<p class="subtitle">${t("proposal_none_confirmed")}</p>`;
+    return;
+  }
+  list.innerHTML = confirmed.map(d => {
+    const rate = (d.latest_parsed_result && d.latest_parsed_result.rate) ? "$" + d.latest_parsed_result.rate : "";
+    return `
+      <label class="proposal-item">
+        <input type="checkbox" class="pp-check" value="${esc(d.request_id)}">
+        ${esc(d.vendor.name)} — ${esc(d.need.description)}
+        <span class="price">${esc(rate)}</span>
+      </label>
+    `;
+  }).join("");
+}
+async function generateProposal() {
+  const title = val("pp-trip-title").trim();
+  const client = val("pp-client-name").trim();
+  const ids = [...document.querySelectorAll(".pp-check:checked")].map(el => el.value);
+  if (!title) { toast("Enter a trip title.", "warn"); return; }
+  if (ids.length === 0) { toast("Select at least one confirmed request.", "warn"); return; }
+  try {
+    const res = await fetch(API + "/api/proposal", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({trip_title: title, client_name: client, request_ids: ids})
+    });
+    if (!res.ok) { toast((await res.json()).detail || "Failed to generate proposal.", "error"); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = title.replace(/\s+/g, "_") + "_proposal.docx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast("Proposal downloaded.", "success");
+  } catch (e) {
+    toast("Network error — could not reach the server.", "error");
+  }
+}
+setLang("en");
 </script>
 </body>
 </html>
