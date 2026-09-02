@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Msafara — Vendor coordination, automated</title>
+<style>
+:root{--ink:#0B0D11;--surface:#14171F;--surface2:#1B1F2A;--line:#262B38;--text:#F2F0EA;--muted:#8890A0;--muted2:#5C6373;--instant:#FF5A36;--standard:#3D7EFF;--good:#34C77B;--warn:#FFC24B;--mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",system-ui,sans-serif;}
+html[data-theme="light"]{--ink:#F7F6F2;--surface:#FFFFFF;--surface2:#F0EEE8;--line:#E4E1D8;--text:#14171F;--muted:#5C6373;--muted2:#8890A0;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--ink);color:var(--text);font-family:var(--sans);line-height:1.55;overflow-x:hidden;}
+a{color:inherit;text-decoration:none;}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px;}
+@media (max-width:720px){.wrap{padding:0 20px;}}
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:rgba(11,13,17,0.85);border-bottom:1px solid var(--line);}
+html[data-theme="light"] nav{background:rgba(247,246,242,0.9);}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px;}
+.logo{font-weight:800;font-size:17px;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px;}
+.logo .dot{width:8px;height:8px;border-radius:2px;background:var(--instant);display:inline-block;}
+.navlinks{display:flex;gap:24px;font-size:14px;color:var(--muted);}
+.navlinks a:hover{color:var(--text);}
+.navright{display:flex;align-items:center;gap:12px;}
+.iconbtn{background:none;border:1px solid var(--line);color:var(--text);width:34px;height:34px;border-radius:7px;cursor:pointer;font-size:14px;}
+select.langsel{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:7px 8px;font-size:12.5px;}
+.navcta{background:var(--text);color:var(--ink);padding:9px 18px;border-radius:7px;font-size:13px;font-weight:700;white-space:nowrap;}
+.hamburger{display:none;background:none;border:1px solid var(--line);color:var(--text);width:34px;height:34px;border-radius:7px;font-size:16px;}
+@media (max-width:720px){.navlinks{display:none;}.hamburger{display:block;}}
+.drawer{display:none;flex-direction:column;gap:14px;padding:16px 20px 20px;border-bottom:1px solid var(--line);background:var(--surface);}
+.drawer.open{display:flex;}
+.hero{padding:80px 0 56px;position:relative;}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;color:var(--instant);font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px;text-transform:uppercase;}
+h1{font-size:52px;font-weight:800;letter-spacing:-1.5px;line-height:1.08;max-width:800px;}
+h1 em{font-style:normal;color:var(--muted2);text-decoration:line-through;text-decoration-color:var(--instant);text-decoration-thickness:3px;}
+@media (max-width:720px){h1{font-size:34px;}}
+.sub{font-size:18px;color:var(--muted);max-width:560px;margin:22px 0 32px;}
+.herobtns{display:flex;gap:12px;flex-wrap:wrap;}
+.btn-primary{background:var(--instant);color:#0B0D11;padding:14px 26px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;border:none;cursor:pointer;}
+.btn-secondary{border:1px solid var(--line);color:var(--text);padding:14px 26px;border-radius:8px;font-weight:600;font-size:14px;display:inline-block;background:none;cursor:pointer;}
+.btn-secondary:hover{border-color:var(--muted);}
+.board{margin-top:60px;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,0.5);}
+.board-top{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);}
+.board-top .b1{font-family:var(--mono);font-size:12px;color:var(--muted);}
+.board-top .live{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--good);}
+.live .pulse{width:6px;height:6px;border-radius:50%;background:var(--good);animation:pulse 1.4s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+.board-rows{height:220px;overflow:hidden;position:relative;}
+.board-rows::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 65%,var(--surface) 100%);pointer-events:none;}
+.board-track{animation:scrollUp 16s linear infinite;}
+@keyframes scrollUp{from{transform:translateY(0);}to{transform:translateY(-50%);}}
+.row{display:grid;grid-template-columns:110px 1fr 100px 110px;gap:12px;padding:11px 20px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:center;}
+.row .id{font-family:var(--mono);font-weight:700;color:var(--standard);}
+.row .who{color:var(--muted);}
+.row .amt{font-family:var(--mono);text-align:right;}
+.row .status{font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:20px;text-align:center;}
+.status.wait{background:rgba(255,194,75,0.15);color:var(--warn);}
+.status.neg{background:rgba(61,126,255,0.15);color:var(--standard);}
+.status.ok{background:rgba(52,199,123,0.15);color:var(--good);}
+.status.urg{background:rgba(255,90,54,0.15);color:var(--instant);}
+.stats{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface);}
+.stats .wrap{display:grid;grid-template-columns:repeat(4,1fr);}
+.stat{padding:26px 0;text-align:center;border-right:1px solid var(--line);}
+.stat:last-child{border-right:none;}
+.stat .n{font-family:var(--mono);font-size:24px;font-weight:800;}
+.stat .l{font-size:11.5px;color:var(--muted);margin-top:4px;}
+@media (max-width:720px){.stats .wrap{grid-template-columns:repeat(2,1fr);}.stat{border-bottom:1px solid var(--line);}}
+section{padding:88px 0;}
+.tag{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;}
+h2{font-size:34px;font-weight:800;letter-spacing:-.8px;max-width:640px;}
+.lead{color:var(--muted);font-size:16px;max-width:560px;margin-top:14px;}
+.problem-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:44px;}
+@media (max-width:720px){.problem-grid{grid-template-columns:1fr;}}
+.pcard{background:var(--surface);padding:28px;}
+.pcard .pnum{font-family:var(--mono);font-size:12px;color:var(--instant);margin-bottom:10px;}
+.pcard h3{font-size:17px;margin-bottom:8px;}
+.pcard p{font-size:14px;color:var(--muted);}
+.steps{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+@media (max-width:900px){.steps{grid-template-columns:1fr;}}
+.step .sn{font-family:var(--mono);font-size:42px;font-weight:800;color:var(--surface2);margin-bottom:10px;}
+.step h3{font-size:17px;margin-bottom:8px;}
+.step p{font-size:14px;color:var(--muted);}
+.feat-grid{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+@media (max-width:900px){.feat-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:600px){.feat-grid{grid-template-columns:1fr;}}
+.feat{background:var(--surface);padding:26px;}
+.feat .ic{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:14px;background:rgba(61,126,255,0.12);}
+.feat h4{font-size:15px;margin-bottom:6px;}
+.feat p{font-size:13px;color:var(--muted);}
+.calc{background:var(--surface);border:1px solid var(--line);border-radius:16px;margin-top:44px;overflow:hidden;}
+.calc-inner{display:grid;grid-template-columns:1fr 1fr;}
+@media (max-width:800px){.calc-inner{grid-template-columns:1fr;}}
+.calc-form{padding:36px;border-right:1px solid var(--line);}
+@media (max-width:800px){.calc-form{border-right:none;border-bottom:1px solid var(--line);}}
+.calc-result{padding:36px;display:flex;flex-direction:column;justify-content:center;}
+.field-row{margin-bottom:22px;}
+.field-row label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:10px;}
+.field-row label .v{font-family:var(--mono);color:var(--text);font-weight:700;}
+input[type=range]{width:100%;accent-color:var(--instant);}
+.rlabel{font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.rvalue{font-family:var(--mono);font-size:36px;font-weight:800;color:var(--good);}
+.rsub{font-size:13px;color:var(--muted);margin-top:6px;}
+.rdivider{height:1px;background:var(--line);margin:20px 0;}
+.rmini{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;color:var(--muted);}
+.rmini b{color:var(--text);font-family:var(--mono);}
+.disclaimer{font-size:11.5px;color:var(--muted2);margin-top:16px;}
+.pricing-grid{margin-top:48px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+@media (max-width:900px){.pricing-grid{grid-template-columns:1fr;}}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:30px;display:flex;flex-direction:column;}
+.plan.hi{border-color:var(--instant);position:relative;}
+.plan.hi::before{content:"MOST PICKED";position:absolute;top:-11px;left:24px;background:var(--instant);color:#0B0D11;font-family:var(--mono);font-size:10px;font-weight:800;padding:3px 10px;border-radius:20px;}
+.plan .pname{font-size:14px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;}
+.plan .pprice{font-size:26px;font-weight:800;font-family:var(--mono);margin:10px 0 2px;}
+.plan .pprice span{font-size:13px;color:var(--muted);font-weight:400;}
+.plan .pdesc{font-size:13px;color:var(--muted);margin-bottom:20px;}
+.plan ul{list-style:none;margin-bottom:24px;flex:1;}
+.plan li{font-size:13.5px;padding:8px 0;border-top:1px solid var(--line);color:var(--muted);display:flex;gap:8px;}
+.plan .pbtn{text-align:center;padding:12px;border-radius:8px;font-size:13px;font-weight:700;border:1px solid var(--line);display:block;}
+.plan.hi .pbtn{background:var(--instant);color:#0B0D11;border:none;}
+.cta{background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line);text-align:center;padding:80px 0;}
+.cta h2{margin:0 auto 12px;max-width:600px;}
+.cta .lead{margin:0 auto 28px;max-width:480px;}
+footer{padding:48px 0;}
+.footgrid{display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;color:var(--muted);font-size:13px;}
+.footgrid a{color:var(--standard);}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center;padding:20px;}
+.modal.open{display:flex;}
+.modalbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;max-width:640px;width:100%;max-height:85vh;overflow:auto;padding:0;}
+.modaltop{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface);}
+.modalclose{background:none;border:1px solid var(--line);color:var(--text);width:30px;height:30px;border-radius:6px;cursor:pointer;}
+.demo{padding:20px;}
+.vlist{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
+.vcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;}
+.vcard .vname{font-weight:700;}
+.vcard .vsub{color:var(--muted);font-size:11.5px;}
+.log{border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px;height:160px;overflow:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.log .m{max-width:80%;padding:8px 11px;border-radius:8px;background:var(--surface2);}
+.log .m.us{align-self:flex-end;background:rgba(61,126,255,0.18);}
+.demo-btns{display:flex;gap:10px;flex-wrap:wrap;}
+[dir="rtl"] .log .m.us{align-self:flex-start;}
+</style>
+</head>
+<body>
+<nav>
+<div class="wrap">
+<div class="logo"><span class="dot"></span>Msafara</div>
+<div class="navlinks"><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#demo-section">Demo</a></div>
+<div class="navright">
+<select class="langsel" id="langsel" onchange="setLang(this.value)">
+<option value="en">EN</option>
+<option value="ar">Arabic</option>
+<option value="fr">FR</option>
+<option value="sw">SW</option>
+<option value="es">ES</option>
+</select>
+<button class="iconbtn" id="themebtn" onclick="toggleTheme()">&#9680;</button>
+<a class="navcta" href="mailto:wadherapryank@gmail.com?subject=Book a Msafara demo">Book a demo</a>
+<button class="hamburger" onclick="document.getElementById('drawer').classList.toggle('open')">&#9776;</button>
+</div>
+</div>
+<div class="drawer" id="drawer"><a href="#how">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#demo-section">Demo</a></div>
+</nav>
+<header class="hero">
+<div class="wrap">
+<div class="eyebrow">AI vendor coordination for tour operators and DMCs</div>
+<h1>Stop chasing vendors over <em>email and WhatsApp</em>, and let Msafara run the thread.</h1>
+<p class="sub">Msafara drafts outreach, follows up when a vendor goes quiet, negotiates within the rules you set, tracks hold deadlines, and turns confirmed bookings into a client-ready proposal, for operators running multi-vendor, multi-day itineraries where coordination still happens over email and WhatsApp, not a GDS.</p>
+<div class="herobtns">
+<a class="btn-primary" href="mailto:wadherapryank@gmail.com?subject=Book a Msafara demo">Book a demo</a>
+<a class="btn-secondary" href="#how">See how it works</a>
+</div>
+<div class="board">
+<div class="board-top"><span class="b1">Live vendor board</span><span class="live"><span class="pulse"></span>LIVE</span></div>
+<div class="board-rows"><div class="board-track" id="track">
+<div class="row"><span class="id">V-118</span><span class="who">Zanzibar Beach Villas</span><span class="amt">$1,240</span><span class="status urg">hold 6h</span></div>
+<div class="row"><span class="id">V-104</span><span class="who">Nairobi Transport Co.</span><span class="amt">$310</span><span class="status wait">waiting</span></div>
+<div class="row"><span class="id">V-097</span><span class="who">Dubai Desert Safaris</span><span class="amt">$860</span><span class="status ok">confirmed</span></div>
+<div class="row"><span class="id">V-085</span><span class="who">Serengeti Lodge Group</span><span class="amt">$1,180</span><span class="status neg">negotiating</span></div>
+<div class="row"><span class="id">V-071</span><span class="who">Doha Airport Transfers</span><span class="amt">$75</span><span class="status ok">confirmed</span></div>
+<div class="row"><span class="id">V-063</span><span class="who">Maasai Mara Camps</span><span class="amt">$980</span><span class="status wait">waiting</span></div>
+<div class="row"><span class="id">V-118</span><span class="who">Zanzibar Beach Villas</span><span class="amt">$1,240</span><span class="status urg">hold 6h</span></div>
+<div class="row"><span class="id">V-104</span><span class="who">Nairobi Transport Co.</span><span class="amt">$310</span><span class="status wait">waiting</span></div>
+<div class="row"><span class="id">V-097</span><span class="who">Dubai Desert Safaris</span><span class="amt">$860</span><span class="status ok">confirmed</span></div>
+<div class="row"><span class="id">V-085</span><span class="who">Serengeti Lodge Group</span><span class="amt">$1,180</span><span class="status neg">negotiating</span></div>
+<div class="row"><span class="id">V-071</span><span class="who">Doha Airport Transfers</span><span class="amt">$75</span><span class="status ok">confirmed</span></div>
+<div class="row"><span class="id">V-063</span><span class="who">Maasai Mara Camps</span><span class="amt">$980</span><span class="status wait">waiting</span></div>
+</div></div>
+</div>
+</div>
+</header>
+<section class="stats"><div class="wrap">
+<div class="stat"><div class="n">5</div><div class="l">Languages, incl. full Arabic RTL</div></div>
+<div class="stat"><div class="n">2</div><div class="l">Channels, email and WhatsApp, one dashboard</div></div>
+<div class="stat"><div class="n">6+</div><div class="l">Vendor scenarios handled automatically</div></div>
+<div class="stat"><div class="n">Mins</div><div class="l">Zero to first proposal, not days</div></div>
+</div></section>
+<section><div class="wrap">
+<div class="tag">The problem</div>
+<h2>You're running a network by hand</h2>
+<p class="lead">The coordination work doesn't show up on an invoice, but it eats the week.</p>
+<div class="problem-grid">
+<div class="pcard"><div class="pnum">01</div><h3>A vendor goes quiet mid-negotiation</h3><p>The thread stalls, nobody follows up on schedule, and the deal drifts until it's too late to recover.</p></div>
+<div class="pcard"><div class="pnum">02</div><h3>A hold deadline slips past</h3><p>A locked rate expires because no one was watching the clock across a dozen open threads at once.</p></div>
+<div class="pcard"><div class="pnum">03</div><h3>Comparing quotes means reopening ten tabs</h3><p>The side-by-side comparison lives in your head and a scratch notepad, not on a screen.</p></div>
+<div class="pcard"><div class="pnum">04</div><h3>Confirmed bookings get retyped by hand</h3><p>Numbers move from an email into a spreadsheet into a proposal document, one typo at a time.</p></div>
+</div>
+</div></section>
+<section id="how"><div class="wrap">
+<div class="tag">How it works</div>
+<h2>Three steps, no new workflow to learn</h2>
+<div class="steps">
+<div class="step"><div class="sn">01</div><h3>Set your requirements and your rules</h3><p>Describe the itinerary once: dates, headcount, budget ceiling, and what you'll accept without being asked.</p></div>
+<div class="step"><div class="sn">02</div><h3>Msafara runs the outreach</h3><p>It drafts and sends requests over email or WhatsApp, follows up when a vendor goes quiet, and negotiates within the bounds you set.</p></div>
+<div class="step"><div class="sn">03</div><h3>You get a ranked comparison, then a proposal</h3><p>Replies land side by side by price as they arrive. Confirmed bookings become a client-ready document automatically.</p></div>
+</div>
+</div></section>
+<section id="features"><div class="wrap">
+<div class="tag">Features</div>
+<h2>Everything the coordination work actually needs</h2>
+<div class="feat-grid">
+<div class="feat"><div class="ic">&#9993;</div><h4>Automated vendor outreach</h4><p>Drafts and sends requests over email or WhatsApp from a single form.</p></div>
+<div class="feat"><div class="ic">&#129309;</div><h4>Smart negotiation</h4><p>Counters over-budget quotes automatically within bounds you set, and knows when to hand the decision back to you.</p></div>
+<div class="feat"><div class="ic">&#128202;</div><h4>Competitive sourcing</h4><p>One need, several vendors, ranked side by side by price as replies land.</p></div>
+<div class="feat"><div class="ic">&#8987;</div><h4>Deadline tracking</h4><p>Flags holds about to expire before you lose the rate.</p></div>
+<div class="feat"><div class="ic">&#128196;</div><h4>One-click proposals</h4><p>Confirmed bookings become a polished, downloadable client quote, no retyping numbers.</p></div>
+<div class="feat"><div class="ic">&#127760;</div><h4>Built multilingual</h4><p>A five-language dashboard with genuine right-to-left support for Arabic, not just translated labels.</p></div>
+</div>
+</div></section>
+<section><div class="wrap">
+<div class="tag">Your numbers</div>
+<h2>Estimate the hours this gets back</h2>
+<p class="lead">Move the sliders to match how you work today. The time-saved assumption is yours to adjust; there's no pilot data yet, so we're not going to pretend otherwise.</p>
+<div class="calc">
+<div class="calc-inner">
+<div class="calc-form">
+<div class="field-row"><label>Itineraries sourced per month<span class="v" id="v1">10</span></label><input type="range" id="s1" min="1" max="60" value="10" oninput="calc()"></div>
+<div class="field-row"><label>Hours spent per itinerary chasing vendors<span class="v" id="v2">6</span></label><input type="range" id="s2" min="1" max="20" value="6" oninput="calc()"></div>
+<div class="field-row"><label>Your time, per hour ($)<span class="v" id="v3">25</span></label><input type="range" id="s3" min="5" max="150" value="25" oninput="calc()"></div>
+<div class="field-row"><label>Assumed time saved by automating outreach<span class="v" id="v4">50%</span></label><input type="range" id="s4" min="0" max="90" value="50" oninput="calc()"></div>
+</div>
+<div class="calc-result">
+<div class="rlabel">Estimated time back / month</div>
+<div class="rvalue" id="rhours">30 hrs</div>
+<div class="rsub">at your inputs, hours no longer spent chasing threads</div>
+<div class="rdivider"></div>
+<div class="rmini"><span>Value of that time / month</span><b id="rvaluex">$750</b></div>
+<div class="rmini"><span>Value of that time / year</span><b id="ryear">$9,000</b></div>
+<div class="disclaimer">Illustrative estimate based on the inputs above, not a performance guarantee. Msafara has not yet run pilot data against real vendors.</div>
+</div>
+</div>
+</div>
+</div></section>
+<section id="pricing"><div class="wrap">
+<div class="tag">Pricing</div>
+<h2>Structure now, numbers once cost is modeled</h2>
+<p class="lead">Final prices depend on LLM and messaging costs per request. Get in touch and we'll scope it to your volume.</p>
+<div class="pricing-grid">
+<div class="plan"><div class="pname">Starter</div><div class="pprice">Contact us</div><div class="pdesc">For solo operators testing the workflow.</div><ul><li>Capped requests / month</li><li>Single language</li><li>Email only</li></ul><a class="pbtn" href="mailto:wadherapryank@gmail.com?subject=Msafara Starter">Get in touch</a></div>
+<div class="plan hi"><div class="pname">Growth</div><div class="pprice">Contact us</div><div class="pdesc">For small teams running multiple itineraries at once.</div><ul><li>WhatsApp + email</li><li>Unlimited requests</li><li>Vendor directory</li><li>Proposal generation</li></ul><a class="pbtn" href="mailto:wadherapryank@gmail.com?subject=Msafara Growth">Get in touch</a></div>
+<div class="plan"><div class="pname">Enterprise</div><div class="pprice">Custom</div><div class="pdesc">For larger DMCs with specific rules and support needs.</div><ul><li>Multi-user</li><li>Custom negotiation rules</li><li>Priority support</li><li>White-label</li></ul><a class="pbtn" href="mailto:wadherapryank@gmail.com?subject=Msafara Enterprise">Get in touch</a></div>
+</div>
+</div></section>
+<section class="cta"><div class="wrap">
+<h2>Ready to stop babysitting vendor threads?</h2>
+<p class="lead">See it running against a mock itinerary in a few minutes.</p>
+<div class="herobtns" style="justify-content:center">
+<a class="btn-primary" href="mailto:wadherapryank@gmail.com?subject=Book a Msafara demo">Book a demo</a>
+<button class="btn-secondary" onclick="document.getElementById('demoModal').classList.add('open')">Try the live demo</button>
+</div>
+</div></section>
+<footer><div class="wrap footgrid">
+<div>&copy; 2026 Msafara. All rights reserved.</div>
+<div><a href="mailto:wadherapryank@gmail.com">wadherapryank@gmail.com</a> &middot; <a href="https://wa.me/917397829282" target="_blank" rel="noopener">WhatsApp</a></div>
+</div></footer>
+<div class="modal" id="demoModal"><div class="modalbox">
+<div class="modaltop"><strong>Live demo, mock workspace</strong><button class="modalclose" onclick="document.getElementById('demoModal').classList.remove('open')">&times;</button></div>
+<div class="demo" id="demo-section">
+<div class="vlist">
+<div class="vcard"><div><div class="vname">Zanzibar Beach Villas</div><div class="vsub">4 nights, hold expires in 6h</div></div><div class="status urg">urgent</div></div>
+<div class="vcard"><div><div class="vname">Nairobi Transport Co.</div><div class="vsub">Airport transfer, awaiting reply</div></div><div class="status wait">waiting</div></div>
+<div class="vcard"><div><div class="vname">Serengeti Lodge Group</div><div class="vsub">3 nights, confirmed at $1,180</div></div><div class="status ok">confirmed</div></div>
+</div>
+<div class="log" id="demoLog">
+<div class="m">Msafara to Zanzibar Beach Villas: Requesting 4 nights, 2 rooms, Oct 12 to 16, budget $1,050.</div>
+<div class="m">Zanzibar Beach Villas: We can offer $1,240 for those dates.</div>
+<div class="m us">Msafara: Countered at $1,050 per your rules, awaiting reply.</div>
+</div>
+<div class="demo-btns">
+<button class="btn-secondary" onclick="demoStep()">Simulate next vendor reply</button>
+<button class="btn-secondary" onclick="toggleDemoRTL()">Preview in Arabic (RTL)</button>
+</div>
+</div>
+</div></div>
+<script>
+function setLang(v){var demo=document.getElementById('demoModal');if(v==='ar'){demo.setAttribute('dir','rtl');}else{demo.removeAttribute('dir');}}
+function toggleDemoRTL(){var demo=document.getElementById('demoModal');if(demo.getAttribute('dir')==='rtl'){demo.removeAttribute('dir');}else{demo.setAttribute('dir','rtl');}}
+function toggleTheme(){var html=document.documentElement;var cur=html.getAttribute('data-theme');var next=cur==='light'?'dark':'light';html.setAttribute('data-theme',next);localStorage.setItem('msafara-theme',next);}
+(function(){var saved=localStorage.getItem('msafara-theme');if(saved){document.documentElement.setAttribute('data-theme',saved);}else{var h=new Date().getHours();document.documentElement.setAttribute('data-theme',(h>=7&&h<19)?'light':'dark');}})();
+var demoMessages=[["Nairobi Transport Co.: Confirmed, $310, driver assigned.",false],["Msafara to Nairobi Transport Co.: Great, locking it in and updating your comparison.",true],["Serengeti Lodge Group: Final hold reminder, rate expires in 2 hours.",false],["Msafara: Reminder flagged, escalating to you now.",true]];
+var demoIdx=0;
+function demoStep(){if(demoIdx>=demoMessages.length)return;var log=document.getElementById('demoLog');var d=document.createElement('div');d.className='m'+(demoMessages[demoIdx][1]?' us':'');d.textContent=demoMessages[demoIdx][0];log.appendChild(d);log.scrollTop=log.scrollHeight;demoIdx++;}
+function calc(){var n=+document.getElementById('s1').value;var h=+document.getElementById('s2').value;var r=+document.getElementById('s3').value;var p=+document.getElementById('s4').value;document.getElementById('v1').textContent=n;document.getElementById('v2').textContent=h;document.getElementById('v3').textContent=r;document.getElementById('v4').textContent=p+'%';var savedHours=Math.round(n*h*(p/100));var val=savedHours*r;document.getElementById('rhours').textContent=savedHours+' hrs';document.getElementById('rvaluex').textContent='$'+val.toLocaleString();document.getElementById('ryear').textContent='$'+(val*12).toLocaleString();}
+calc();
+</script>
+</body>
+</html>
