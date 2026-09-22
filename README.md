@@ -13,25 +13,9 @@ A multi-agent platform for tour operators and DMCs that automates vendor coordin
 
 **How I'd measure it:** concurrent requests one coordinator can run, requests that stall on unanswered silence, and time from request to client-ready proposal.
 
-## Quickstart
+## What's in this repo
 
-```
-git clone <this-repo-url>
-cd vendor_agent
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-python3 app.py
-```
-
-Open http://localhost:8000. The repo ships with a seeded database (`vendor_requests.db`) containing a realistic 12-person Kilimanjaro & Zanzibar trip scenario, so the dashboard has real data immediately.
-
-Reset to a fresh seeded state at any time:
-
-```
-rm vendor_requests.db && python3 seed_demo.py
-```
-
-A terminal-only alternative is available via `python3 cli.py`.
+This repo contains the live demo and core workflow modules (`graph.py`, `storage.py`, `dispatch.py`, `inbox_poll.py`). The full backend (FastAPI server, CLI, and seeded demo database) is not published here; the live demo above runs the complete flow in mock mode.
 
 ## Core capabilities
 
@@ -50,53 +34,16 @@ A terminal-only alternative is available via `python3 cli.py`.
 
 | Variable | Purpose |
 |---|---|
-| `ANTHROPIC_API_KEY` | Enables AI-based drafting and reply parsing (falls back to a rule-based mock if unset) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Outbound email dispatch |
-| `IMAP_HOST` / `IMAP_USER` / `IMAP_PASSWORD` | Inbound email polling |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_WHATSAPP_FROM` | WhatsApp dispatch |
-
-Everything degrades gracefully when credentials aren't set — the app runs fully in demo/mock mode with clear "not configured" messaging.
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Outbound email dispatch (`dispatch.py`) |
+| `IMAP_HOST` / `IMAP_USER` / `IMAP_PASSWORD` | Inbound email polling (`inbox_poll.py`) |
 
 ## Architecture
 
-- `state.py` — persistent state object for each request (status, message history, follow-up/negotiation counters, deadlines)
-- `llm_nodes.py` — drafting and reply-parsing logic; uses a rule-based mock unless `ANTHROPIC_API_KEY` is set
-- `graph.py` — the state machine wiring the workflow together, plus entry points for inbound replies and scheduled checks
-- `storage.py` / `cli.py` — persistence layer and terminal interface
-- `dispatch.py` / `inbox_poll.py` — email send/poll
-- `whatsapp_dispatch.py` / `message_router.py` — WhatsApp dispatch and channel routing
-- `sourcing.py` — competitive sourcing across multiple vendors
-- `holds.py` — expiring-hold tracking
-- `negotiation_rules.py` — bounded negotiation logic (placeholder defaults — replace with your actual walk-away rules)
-- `revision.py` — reopening confirmed requests for revision
-- `vendor_directory.py` — vendor stats built automatically from request history
-- `proposal_doc.py` — client-facing proposal generation
-- `app.py` / `static/index.html` — FastAPI backend and single-page dashboard
-
-## CLI reference
-
-```
-python3 cli.py new              # create a request
-python3 cli.py queue            # list all requests
-python3 cli.py reply <id>       # process a vendor reply
-python3 cli.py check            # run timeout + hold-expiry sweep
-python3 cli.py show <id>        # full detail + message history
-python3 cli.py poll             # check inbox for new replies
-python3 cli.py source           # create a multi-vendor sourcing request
-python3 cli.py compare <id>     # compare sourcing responses
-python3 cli.py revise <id>      # reopen a confirmed request
-```
-
-## API
-
-```
-GET  /api/vendors
-GET  /api/vendors/{contact_address}
-PATCH /api/vendors/{contact_address}/notes
-POST /api/proposal   {"trip_title": "...", "client_name": "...", "request_ids": [...]}
-POST /api/check
-POST /api/poll
-```
+- `graph.py` — the LangGraph state machine wiring the workflow together, plus entry points for inbound replies and scheduled checks
+- `storage.py` — SQLite persistence layer
+- `dispatch.py` — outbound email send
+- `inbox_poll.py` — inbound email polling and reply matching
+- `index.html` — the live single-page demo
 
 ## How it was built
 
@@ -104,8 +51,8 @@ Built AI-assisted with Claude as coding partner. Product scope, requirements (se
 
 ## Known limitations
 
-- No authentication — every endpoint is open; add an auth layer before exposing beyond local/demo use
+- No authentication — add an auth layer before exposing beyond local/demo use
 - No concurrency control — SQLite without locking, suited for single-user use
 - Currency is cosmetic — the UI displays `$` regardless of the stored currency
-- Negotiation logic uses placeholder defaults; replace `counter_offer_rate()` in `negotiation_rules.py` with real walk-away rules
+- Negotiation logic uses placeholder defaults, not real walk-away rules
 - WhatsApp replies require a webhook receiver (not included) — outbound dispatch only for now
