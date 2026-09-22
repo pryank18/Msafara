@@ -2,6 +2,17 @@
 
 A multi-agent platform for tour operators and DMCs that automates vendor coordination end-to-end: drafting requests, sending, following up on silence, negotiating within bounded rules, tracking hold expiry, comparing competitive offers, and generating client-facing proposals. Runs in a fully demoable mock mode with zero API keys required.
 
+**Live demo:** https://pryank18.github.io/Msafara/
+
+## Product decisions
+
+- **Bounded negotiation, never autonomous.** The agent counters within operator-set rules and a capped number of rounds; fully autonomous negotiation is out of scope.
+- **Escalate ambiguity to a human.** Partial or unclear vendor replies go back to the coordinator instead of being guessed at.
+- **Runs with zero API keys.** A rule-based mock mode means anyone can demo the full flow; AI drafting and parsing switch on when a key is added.
+- **Meet vendors where they already are.** Email and WhatsApp, not a vendor portal nobody will log into.
+
+**How I'd measure it:** concurrent requests one coordinator can run, requests that stall on unanswered silence, and time from request to client-ready proposal.
+
 ## Quickstart
 
 ```
@@ -86,6 +97,10 @@ POST /api/proposal   {"trip_title": "...", "client_name": "...", "request_ids": 
 POST /api/check
 POST /api/poll
 ```
+
+## How it was built
+
+Built AI-assisted with Claude as coding partner. Product scope, requirements (see `docs/`), and QA are mine.
 
 ## Known limitations
 
