@@ -379,6 +379,7 @@
   </div>
 </div>
 <div id="toast-stack"></div>
+<script src="demo-api.js"></script>
 <script>
 const I18N = {
   en: {
@@ -397,7 +398,7 @@ const I18N = {
     f_vendors: "Vendors",
     f_channel: "Contact channel", channel_email: "email", channel_whatsapp: "WhatsApp",
     vendors_title: "Vendor directory", vendors_subtitle: "Builds itself from usage — every vendor you've contacted, with a live confirm rate.",
-    th_channel: "Channel", th_category: "Category", th_requests: "Requests", th_confirm_rate: "Confirm rate",
+    th_channel: "Channel", th_category: "Category", th_requests: "Requests", th_confirm_rate: "Confirm rate", th_last_used: "Last used",
     vendors_empty: "No vendors yet — they're added automatically the first time you send a request.",
     proposal_title: "Generate client proposal", proposal_subtitle: "Pick confirmed requests to include — pulls the actual agreed rates into a downloadable document.",
     f_trip_title: "Trip title", f_client_name: "Client name (optional)", f_select_confirmed: "Confirmed requests to include",
@@ -455,7 +456,7 @@ const I18N = {
     f_vendors: "الموردون",
     f_channel: "قناة التواصل", channel_email: "بريد إلكتروني", channel_whatsapp: "واتساب",
     vendors_title: "دليل الموردين", vendors_subtitle: "يُبنى تلقائيًا من الاستخدام — كل مورد تواصلت معه، مع نسبة تأكيد حية.",
-    th_channel: "القناة", th_category: "الفئة", th_requests: "الطلبات", th_confirm_rate: "نسبة التأكيد",
+    th_channel: "القناة", th_category: "الفئة", th_requests: "الطلبات", th_confirm_rate: "نسبة التأكيد", th_last_used: "آخر استخدام",
     vendors_empty: "لا يوجد موردون بعد — تتم إضافتهم تلقائيًا عند إرسال أول طلب.",
     proposal_title: "إنشاء عرض للعميل", proposal_subtitle: "اختر الطلبات المؤكدة لتضمينها — يسحب الأسعار المتفق عليها فعليًا إلى مستند قابل للتنزيل.",
     f_trip_title: "عنوان الرحلة", f_client_name: "اسم العميل (اختياري)", f_select_confirmed: "الطلبات المؤكدة المراد تضمينها",
@@ -513,7 +514,7 @@ const I18N = {
     f_vendors: "Fournisseurs",
     f_channel: "Canal de contact", channel_email: "e-mail", channel_whatsapp: "WhatsApp",
     vendors_title: "Répertoire des fournisseurs", vendors_subtitle: "Se construit à partir de l'usage — chaque fournisseur contacté, avec un taux de confirmation en direct.",
-    th_channel: "Canal", th_category: "Catégorie", th_requests: "Demandes", th_confirm_rate: "Taux de confirmation",
+    th_channel: "Canal", th_category: "Catégorie", th_requests: "Demandes", th_confirm_rate: "Taux de confirmation", th_last_used: "Dernière utilisation",
     vendors_empty: "Aucun fournisseur pour l'instant — ils sont ajoutés automatiquement dès votre première demande.",
     proposal_title: "Générer une proposition client", proposal_subtitle: "Choisissez les demandes confirmées à inclure — récupère les tarifs réellement convenus dans un document téléchargeable.",
     f_trip_title: "Titre du voyage", f_client_name: "Nom du client (facultatif)", f_select_confirmed: "Demandes confirmées à inclure",
@@ -571,7 +572,7 @@ const I18N = {
     f_vendors: "Wauzaji",
     f_channel: "Njia ya mawasiliano", channel_email: "barua pepe", channel_whatsapp: "WhatsApp",
     vendors_title: "Orodha ya wauzaji", vendors_subtitle: "Inajijenga kutoka kwa matumizi — kila muuzaji uliyewasiliana naye, na kiwango cha uthibitisho cha moja kwa moja.",
-    th_channel: "Njia", th_category: "Aina", th_requests: "Maombi", th_confirm_rate: "Kiwango cha uthibitisho",
+    th_channel: "Njia", th_category: "Aina", th_requests: "Maombi", th_confirm_rate: "Kiwango cha uthibitisho", th_last_used: "Mara ya mwisho",
     vendors_empty: "Hakuna wauzaji bado — wanaongezwa kiotomatiki mara ya kwanza unapotuma ombi.",
     proposal_title: "Tengeneza pendekezo la mteja", proposal_subtitle: "Chagua maombi yaliyothibitishwa ya kujumuisha — huchukua bei zilizokubaliwa kikamilifu kwenye hati inayoweza kupakuliwa.",
     f_trip_title: "Kichwa cha safari", f_client_name: "Jina la mteja (si lazima)", f_select_confirmed: "Maombi yaliyothibitishwa ya kujumuisha",
@@ -629,7 +630,7 @@ const I18N = {
     f_vendors: "वेंडर",
     f_channel: "संपर्क माध्यम", channel_email: "ईमेल", channel_whatsapp: "व्हाट्सएप",
     vendors_title: "वेंडर निर्देशिका", vendors_subtitle: "उपयोग से खुद-ब-खुद बनती है — हर वह वेंडर जिससे आपने संपर्क किया, लाइव पुष्टि दर के साथ।",
-    th_channel: "माध्यम", th_category: "श्रेणी", th_requests: "अनुरोध", th_confirm_rate: "पुष्टि दर",
+    th_channel: "माध्यम", th_category: "श्रेणी", th_requests: "अनुरोध", th_confirm_rate: "पुष्टि दर", th_last_used: "अंतिम उपयोग",
     vendors_empty: "अभी तक कोई वेंडर नहीं — जब आप पहला अनुरोध भेजते हैं तो वे स्वतः जुड़ जाते हैं।",
     proposal_title: "ग्राहक प्रस्ताव तैयार करें", proposal_subtitle: "शामिल करने के लिए पुष्टि किए गए अनुरोध चुनें — वास्तविक सहमत दरों को डाउनलोड करने योग्य दस्तावेज़ में लाता है।",
     f_trip_title: "यात्रा शीर्षक", f_client_name: "ग्राहक का नाम (वैकल्पिक)", f_select_confirmed: "शामिल करने के लिए पुष्टि किए गए अनुरोध",
@@ -1039,7 +1040,7 @@ async function generateProposal() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = title.replace(/\s+/g, "_") + "_proposal.docx";
+    a.download = title.replace(/\s+/g, "_") + "_proposal" + (res.headers.get("X-Ext") || ".docx");
     document.body.appendChild(a);
     a.click();
     a.remove();
