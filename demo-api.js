@@ -299,7 +299,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     const bar = document.createElement("div");
-    bar.style.cssText = "position:fixed;bottom:12px;right:12px;z-index:50;background:#1f2937;color:#e5e7eb;border:1px solid #374151;border-radius:8px;padding:8px 12px;font:12px/1.4 system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.25)";
+    bar.style.cssText = "position:fixed;top:12px;right:12px;z-index:50;background:#1f2937;color:#e5e7eb;border:1px solid #374151;border-radius:8px;padding:8px 12px;font:12px/1.4 system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.25)";
     bar.innerHTML = 'Live demo · sample trip data runs in your browser · <a href="?reset=1" style="color:#f59e0b">reset</a>';
     document.body.appendChild(bar);
   });
