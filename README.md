@@ -15,7 +15,7 @@ A multi-agent platform for tour operators and DMCs that automates vendor coordin
 
 ## What's in this repo
 
-This repo contains the live demo and core workflow modules (`graph.py`, `storage.py`, `dispatch.py`, `inbox_poll.py`). The full backend (FastAPI server, CLI, and seeded demo database) is not published here; the live demo above runs the complete flow in mock mode.
+This repo contains the live demo and core workflow modules (`graph.py`, `storage.py`, `dispatch.py`, `inbox_poll.py`). The full backend (FastAPI server, CLI, and seeded demo database) is not published here; the live demo above runs the complete flow in the browser with sample data (`demo-api.js`).
 
 ## Core capabilities
 
@@ -43,7 +43,8 @@ This repo contains the live demo and core workflow modules (`graph.py`, `storage
 - `storage.py` — SQLite persistence layer
 - `dispatch.py` — outbound email send
 - `inbox_poll.py` — inbound email polling and reply matching
-- `index.html` — the live single-page demo
+- `index.html` — the single-page dashboard
+- `demo-api.js` — in-browser stand-in for the API on GitHub Pages, seeded with a 12-person Kilimanjaro & Zanzibar trip (does nothing when served by the real backend)
 
 ## How it was built
 
