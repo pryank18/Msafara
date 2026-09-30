@@ -1,4 +1,8 @@
-# Vendor Coordination Agent
+# Msafara — Vendor Coordination Agent
+
+> 📘 **[Read the product case study on Notion](https://fern-appliance-85f.notion.site/3ebefd17b766814b8760e8717345b4a7)** — problem, key decisions, what was cut and how I'd measure it.
+>
+> **Live demo:** [pryank18.github.io/Msafara](https://pryank18.github.io/Msafara/) · **Docs:** [PRD](https://github.com/pryank18/Msafara/blob/main/docs/PRD.md) · [BRD](https://github.com/pryank18/Msafara/blob/main/docs/BRD.md) · [MRD](https://github.com/pryank18/Msafara/blob/main/docs/MRD.md) · [Spec](https://github.com/pryank18/Msafara/blob/main/docs/product-spec.md) · **More work:** [Notion portfolio](https://fern-appliance-85f.notion.site/Pryank-Wadhera-3eaefd17b76680c88283e85a3217ff52)
 
 A multi-agent platform for tour operators and DMCs that automates vendor coordination end-to-end: drafting requests, sending, following up on silence, negotiating within bounded rules, tracking hold expiry, comparing competitive offers, and generating client-facing proposals. Runs in a fully demoable mock mode with zero API keys required.
 
