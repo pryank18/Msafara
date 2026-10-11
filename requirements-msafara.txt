@@ -1,0 +1,10 @@
+pydantic
+langgraph
+langgraph-checkpoint-sqlite
+chromadb
+numpy
+fastapi
+uvicorn
+# dev / tests
+pytest
+httpx

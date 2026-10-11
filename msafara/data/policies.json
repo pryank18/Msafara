@@ -1,0 +1,68 @@
+{
+ "policy_id": "POL-001",
+ "markup_pct": 12,
+ "max_discount_pct": 10,
+ "max_rounds": 2,
+ "discount_schedule": [
+  10,
+  5
+ ],
+ "over_anchor_tolerance_pct": 10,
+ "confidence_threshold": 0.6,
+ "preferred_vendor_ids": [
+  "V003",
+  "V004",
+  "V009",
+  "V012",
+  "V016",
+  "V020",
+  "V022",
+  "V023",
+  "V024",
+  "V028",
+  "V031",
+  "V047",
+  "V049",
+  "V054",
+  "V057",
+  "V059",
+  "V064",
+  "V071",
+  "V072",
+  "V074"
+ ],
+ "blacklist_vendor_ids": [
+  "V026",
+  "V036",
+  "V044",
+  "V050",
+  "V056",
+  "V080"
+ ],
+ "sections": [
+  {
+   "title": "Markup",
+   "text": "Operator markup on vendor net rates is 12% on hotels, transport and activities. Never disclose markup or floor rates to vendors."
+  },
+  {
+   "title": "Negotiation limits",
+   "text": "Counter-offers may be at most 10% below the vendor quote and never below the floor rate on file. At most 2 negotiation rounds per service. Anything outside these bounds is escalated to a human."
+  },
+  {
+   "title": "Cancellation terms",
+   "text": "Operator standard: free cancellation up to 14 days before arrival, 50% charge 7 to 13 days before, 100% inside 7 days. Ask vendors to match or improve on these terms."
+  },
+  {
+   "title": "Preferred vendors",
+   "text": "Preferred vendors are contacted first and get a small scoring boost. They are flagged in each vendor profile."
+  },
+  {
+   "title": "Blacklist",
+   "text": "Blacklisted vendors must never be contacted or selected, regardless of price."
+  },
+  {
+   "title": "Approvals",
+   "text": "No message is sent to a vendor and no quote is accepted without operator approval. No payments are made by the system."
+  }
+ ]
+}
