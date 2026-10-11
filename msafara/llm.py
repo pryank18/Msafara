@@ -100,7 +100,7 @@ class LocalClient:
 
 
 class HostedClient:
-    """Free-tier alternative backend (hosted-model API key). Mimics `messages.create`.
+    """Free-tier alternative backend (free hosted-model API key). Mimics `messages.create`.
 
     Results from this backend must be labelled with the hosted model, never as the default model.
     Set MSAFARA_MODEL to this backend's model id (default hosted-default).
