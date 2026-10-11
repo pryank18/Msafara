@@ -41,7 +41,7 @@ def approve_all(gate):
 
 
 class Stub:
-    """Scripted stand-in for ApiClient(): script(system, user) -> text."""
+    """Scripted stand-in for the LLM client: script(system, user) -> text."""
     def __init__(self, script):
         self.script, self.calls = script, []
         self.messages = SimpleNamespace(create=self._create)
