@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Free prompt-version eval. Pick ONE backend:
+#   Local model server (no signup, runs on your machine):  local pull local-model ; export MSAFARA_LLM_PROVIDER=local
+#   Free hosted-model API key:                 export MSAFARA_LLM_KEY=...
+# Then: bash scripts/run_prompt_eval.sh
+set -euo pipefail
+cd "$(dirname "$0")/.."
+if [ "${MSAFARA_LLM_PROVIDER:-}" = "local" ]; then M="local/${MSAFARA_MODEL:-local-model}"; else M="${MSAFARA_MODEL:-hosted-default}"; fi
+for v in v1 v2; do
+  MSAFARA_PROMPT_INTAKE=$v python -m msafara.evals.run --intake-only --label "intake-$v ($M)"
+done
+python -m msafara.evals.run --report
