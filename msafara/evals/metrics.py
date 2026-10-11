@@ -2,7 +2,7 @@
 (except where noted), so a bug in an agent cannot hide itself.
 
 Rule-based checks: extraction, relevance, bounds, escalation, grounding, parse accuracy, unapproved sends.
-Judge: message tone/clarity - heuristic judge in mock mode, the model (prompts/judge_v1.md) when a key is set.
+Judge: message tone/clarity - heuristic judge in mock mode, live LLM (prompts/judge_v1.md) when a key is set.
 """
 import math
 import re
