@@ -388,7 +388,7 @@
     <h1 data-i18n="status_title">System status</h1>
     <p class="subtitle" data-i18n="status_subtitle">What's actually wired up versus running in mock mode.</p>
     <div class="status-strip" id="status-strip"></div>
-    <p class="subtitle" style="max-width: 560px;" data-i18n="status_note">Mock mode uses rule-based stand-ins for drafting and parsing so the platform runs without an API key. Set LLM_API_KEY, SMTP_*, and IMAP_* environment variables to make dispatch and inbox polling real.</p>
+    <p class="subtitle" style="max-width: 560px;" data-i18n="status_note">Mock mode uses rule-based stand-ins for drafting and parsing so the platform runs without an API key. Set the LLM API key and the SMTP_* and IMAP_* environment variables to make dispatch and inbox polling real.</p>
   </div>
 </main>
 <div class="modal-backdrop" id="modal-backdrop">
@@ -450,7 +450,7 @@ const I18N = {
     manual_7: "Recording a WhatsApp reply yourself — there's no inbound polling for WhatsApp the way IMAP works for email",
     manual_8: "Picking which confirmed requests go into a client proposal, and reviewing it before it's sent",
     status_title: "System status", status_subtitle: "What's actually wired up versus running in mock mode.",
-    status_note: "Mock mode uses rule-based stand-ins for drafting and parsing so the platform runs without an API key. Set LLM_API_KEY, SMTP_*, and IMAP_* environment variables to make dispatch and inbox polling real.",
+    status_note: "Mock mode uses rule-based stand-ins for drafting and parsing so the platform runs without an API key. Set the LLM API key and the SMTP_* and IMAP_* environment variables to make dispatch and inbox polling real.",
     llm_status: "LLM", llm_mock: "mock mode", llm_live: "live (LLM)",
     smtp_status: "SMTP dispatch", imap_status: "IMAP poll", whatsapp_status: "WhatsApp dispatch", cfg_yes: "configured", cfg_no: "not configured",
     modal_process_reply: "Process reply", modal_lock: "Mark locked in", modal_revise: "Revise (details changed)",
@@ -508,7 +508,7 @@ const I18N = {
     manual_7: "تسجيل رد واتساب بنفسك — لا يوجد فحص تلقائي للرسائل الواردة عبر واتساب كما هو الحال مع البريد عبر IMAP",
     manual_8: "اختيار الطلبات المؤكدة التي تُدرج في عرض العميل، ومراجعته قبل إرساله",
     status_title: "حالة النظام", status_subtitle: "ما هو متصل فعليًا مقابل ما يعمل في وضع المحاكاة.",
-    status_note: "يستخدم وضع المحاكاة بدائل قائمة على القواعد للصياغة والتحليل حتى تعمل المنصة دون مفتاح API. اضبط متغيرات LLM_API_KEY وSMTP_* وIMAP_* لتفعيل الإرسال الفعلي وفحص البريد.",
+    status_note: "يستخدم وضع المحاكاة بدائل قائمة على القواعد للصياغة والتحليل حتى تعمل المنصة دون مفتاح API. اضبط مفتاح API للنموذج اللغوي ومتغيرات SMTP_* وIMAP_* لتفعيل الإرسال الفعلي وفحص البريد.",
     llm_status: "نموذج اللغة", llm_mock: "وضع المحاكاة", llm_live: "مباشر (LLM)",
     smtp_status: "إرسال SMTP", imap_status: "فحص IMAP", whatsapp_status: "إرسال واتساب", cfg_yes: "مُفعّل", cfg_no: "غير مُفعّل",
     modal_process_reply: "معالجة الرد", modal_lock: "تأكيد الحجز النهائي", modal_revise: "تعديل (تغيّرت التفاصيل)",
@@ -566,7 +566,7 @@ const I18N = {
     manual_7: "Enregistrer vous-même une réponse WhatsApp — il n'existe pas d'équivalent IMAP pour vérifier les messages WhatsApp entrants",
     manual_8: "Choisir quelles demandes confirmées figurent dans une proposition client, et la relire avant envoi",
     status_title: "État du système", status_subtitle: "Ce qui est réellement connecté par rapport au mode simulation.",
-    status_note: "Le mode simulation utilise des substituts basés sur des règles pour la rédaction et l'analyse afin que la plateforme fonctionne sans clé API. Définissez LLM_API_KEY, SMTP_* et IMAP_* pour activer l'envoi et la vérification réels.",
+    status_note: "Le mode simulation utilise des substituts basés sur des règles pour la rédaction et l'analyse afin que la plateforme fonctionne sans clé API. Définissez la clé API du modèle de langage, SMTP_* et IMAP_* pour activer l'envoi et la vérification réels.",
     llm_status: "Modèle de langage", llm_mock: "mode simulation", llm_live: "en direct (LLM)",
     smtp_status: "Envoi SMTP", imap_status: "Vérification IMAP", whatsapp_status: "Envoi WhatsApp", cfg_yes: "configuré", cfg_no: "non configuré",
     modal_process_reply: "Traiter la réponse", modal_lock: "Marquer comme finalisé", modal_revise: "Modifier (détails changés)",
@@ -624,7 +624,7 @@ const I18N = {
     manual_7: "Kurekodi jibu la WhatsApp wewe mwenyewe — hakuna ukaguzi wa kiotomatiki wa ujumbe unaoingia wa WhatsApp kama ilivyo kwa barua pepe kupitia IMAP",
     manual_8: "Kuchagua ni maombi gani yaliyothibitishwa yataingizwa kwenye pendekezo la mteja, na kulikagua kabla ya kulituma",
     status_title: "Hali ya mfumo", status_subtitle: "Kile ambacho kimeunganishwa kikamilifu dhidi ya kinachoendeshwa katika hali ya kuiga.",
-    status_note: "Hali ya kuiga hutumia mbadala zenye kanuni za kuandika na kuchambua ili mfumo ufanye kazi bila ufunguo wa API. Weka LLM_API_KEY, SMTP_*, na IMAP_* ili kuwezesha utumaji na ukaguzi wa barua pepe halisi.",
+    status_note: "Hali ya kuiga hutumia mbadala zenye kanuni za kuandika na kuchambua ili mfumo ufanye kazi bila ufunguo wa API. Weka ufunguo wa API wa LLM, SMTP_*, na IMAP_* ili kuwezesha utumaji na ukaguzi wa barua pepe halisi.",
     llm_status: "Kielelezo cha lugha", llm_mock: "hali ya kuiga", llm_live: "moja kwa moja (LLM)",
     smtp_status: "Utumaji wa SMTP", imap_status: "Ukaguzi wa IMAP", whatsapp_status: "Utumaji wa WhatsApp", cfg_yes: "kimewekwa", cfg_no: "hakijawekwa",
     modal_process_reply: "Shughulikia jibu", modal_lock: "Weka alama kama limekamilika", modal_revise: "Rekebisha (maelezo yamebadilika)",
@@ -682,7 +682,7 @@ const I18N = {
     manual_7: "व्हाट्सएप जवाब खुद दर्ज करना — ईमेल के लिए IMAP जैसा कोई स्वचालित इनबॉक्स जांच व्हाट्सएप के लिए मौजूद नहीं है",
     manual_8: "ग्राहक प्रस्ताव में कौन से पुष्टि किए गए अनुरोध शामिल करने हैं यह चुनना, और भेजने से पहले उसकी समीक्षा करना",
     status_title: "सिस्टम स्थिति", status_subtitle: "वास्तव में क्या जुड़ा है बनाम मॉक मोड में क्या चल रहा है।",
-    status_note: "मॉक मोड ड्राफ्टिंग और पार्सिंग के लिए नियम-आधारित विकल्पों का उपयोग करता है ताकि प्लेटफ़ॉर्म बिना API कुंजी के चल सके। वास्तविक भेजने और इनबॉक्स जांच के लिए LLM_API_KEY, SMTP_*, और IMAP_* सेट करें।",
+    status_note: "मॉक मोड ड्राफ्टिंग और पार्सिंग के लिए नियम-आधारित विकल्पों का उपयोग करता है ताकि प्लेटफ़ॉर्म बिना API कुंजी के चल सके। वास्तविक भेजने और इनबॉक्स जांच के लिए LLM API कुंजी, SMTP_*, और IMAP_* सेट करें।",
     llm_status: "भाषा मॉडल", llm_mock: "मॉक मोड", llm_live: "लाइव (LLM)",
     smtp_status: "SMTP भेजना", imap_status: "IMAP जांच", whatsapp_status: "व्हाट्सएप भेजना", cfg_yes: "कॉन्फ़िगर किया गया", cfg_no: "कॉन्फ़िगर नहीं किया गया",
     modal_process_reply: "जवाब संसाधित करें", modal_lock: "अंतिम रूप से चिह्नित करें", modal_revise: "संशोधित करें (विवरण बदल गया)",
