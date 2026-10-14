@@ -3,7 +3,7 @@
 * One chokepoint: `structured_call(agent, user, schema)` -> validated Pydantic object.
   Output is parsed as JSON, validated against the schema, and retried once with the
   validation error fed back. Failure raises LLMOutputError (callers fall back / escalate).
-* No LLM_API_KEY -> `mock_mode()` is True and agents use their rule-based paths.
+* No LLM_API_KEY (or other backend) -> `mock_mode()` is True and agents use their rule-based paths.
 * `set_client()` lets tests inject a stub with the same `.messages.create` surface.
 * Prompts are versioned files in msafara/prompts/<agent>_v<N>.md. `active.json` picks
   the version; env MSAFARA_PROMPT_<AGENT>=v2 overrides it per run (used by evals).
@@ -18,6 +18,7 @@ from pydantic import BaseModel, ValidationError
 
 PROMPTS = Path(__file__).parent / "prompts"
 DEFAULT_MODEL = "primary-default"
+FREE_TIER_MODEL = "hosted-default"
 T = TypeVar("T", bound=BaseModel)
 
 _client = None
@@ -43,8 +44,17 @@ def _provider() -> str:
     return (os.environ.get("MSAFARA_LLM_PROVIDER") or os.environ.get("MSAFARA_BACKEND") or "").lower()
 
 
+def _primary_key() -> str:
+    return os.environ.get("LLM_API_KEY", "")
+
+
+def _is_default_family(model: str) -> bool:
+    """True when `model` belongs to the default model family (swapped for the backend's own model)."""
+    return model.split("-")[0] == DEFAULT_MODEL.split("-")[0]
+
+
 def _llm_key() -> str:
-    """Generic key name first; legacy provider-specific names still work."""
+    """Generic key name first; legacy names still work."""
     return os.environ.get("MSAFARA_LLM_KEY") or os.environ.get("MSAFARA_LLM_KEY") or os.environ.get("MSAFARA_LLM_KEY") or ""
 
 
@@ -53,7 +63,7 @@ def get_client():
         return None
     if _client is not None:
         return _client
-    if os.environ.get("LLM_API_KEY"):
+    if _primary_key():
         pass
         return ApiClient()
     if _provider() == "ollama":
@@ -87,7 +97,7 @@ class OllamaClient:
 
     def create(self, model, max_tokens, system, messages, **_):
         import urllib.request
-        if model.startswith("primary"):
+        if _is_default_family(model):
             model = self.default_model
         body = {"model": model, "stream": False, "format": "json",
                 "options": {"temperature": 0, "num_predict": max_tokens},
@@ -102,8 +112,8 @@ class OllamaClient:
 class HostedClient:
     """Free-tier alternative backend (free hosted-model API key). Mimics `messages.create`.
 
-    Results from this backend must be labelled with the hosted model, never as the default model.
-    Set MSAFARA_MODEL to this backend's model id (default hosted-default).
+    Results from this backend must be labelled with its own model id, never as the default model.
+    Set MSAFARA_MODEL to this backend's model id (default FREE_TIER_MODEL).
     """
     def __init__(self):
         self.key = _llm_key()
@@ -111,8 +121,8 @@ class HostedClient:
 
     def create(self, model, max_tokens, system, messages, **_):
         import urllib.request
-        if model.startswith("primary"):
-            model = "hosted-default"
+        if _is_default_family(model):
+            model = FREE_TIER_MODEL
         body = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "model" if m["role"] == "assistant" else "user",
@@ -141,12 +151,12 @@ def mock_mode() -> bool:
 def backend_label() -> str:
     if mock_mode():
         return "deterministic rules engine (no model connected)"
-    if _client is None and not os.environ.get("LLM_API_KEY"):
+    if _client is None and not _primary_key():
         if _provider() == "ollama":
             m = os.environ.get("MSAFARA_MODEL", OllamaClient.default_model)
-            return f"llm:ollama/{m if not m.startswith('primary') else OllamaClient.default_model}"
-        m = os.environ.get("MSAFARA_MODEL", "hosted-default")
-        return f"llm:{m if not m.startswith('primary') else 'hosted-default'}"
+            return f"llm:ollama/{m if not _is_default_family(m) else OllamaClient.default_model}"
+        m = os.environ.get("MSAFARA_MODEL", FREE_TIER_MODEL)
+        return f"llm:{m if not _is_default_family(m) else FREE_TIER_MODEL}"
     return f"llm:{os.environ.get('MSAFARA_MODEL', DEFAULT_MODEL)}"
 
 

@@ -135,9 +135,9 @@ def test_hosted_adapter_parses_response(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: io.BytesIO(json.dumps(payload).encode()))
     c = llm.get_client()
     assert isinstance(c, llm.HostedClient)
-    r = c.messages.create(model="primary-x", max_tokens=10, system="s", messages=[{"role": "user", "content": "u"}])
+    r = c.messages.create(model=llm.DEFAULT_MODEL.split("-")[0] + "-x", max_tokens=10, system="s", messages=[{"role": "user", "content": "u"}])
     assert r.content[0].text == '{"a": 1}'
-    assert llm.backend_label().startswith("llm:hosted")
+    assert llm.backend_label() == "llm:" + llm.FREE_TIER_MODEL
     llm.force_mock(False)
 
 
@@ -154,7 +154,7 @@ def test_ollama_adapter(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", fake)
     c = llm.get_client()
     assert isinstance(c, llm.OllamaClient)
-    r = c.messages.create(model="primary-x", max_tokens=5, system="s", messages=[{"role": "user", "content": "u"}])
+    r = c.messages.create(model=llm.DEFAULT_MODEL.split("-")[0] + "-x", max_tokens=5, system="s", messages=[{"role": "user", "content": "u"}])
     assert r.content[0].text == '{"b": 2}'
     assert seen["body"]["model"] == "qwen2.5:7b" and seen["body"]["messages"][0]["role"] == "system"
     assert llm.backend_label() == "llm:ollama/qwen2.5:7b"
