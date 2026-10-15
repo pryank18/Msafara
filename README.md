@@ -86,7 +86,7 @@ Sabotage tests prove each metric can fail, so a pass means something.
 Run the prompt-version comparison on a free backend (a local Ollama model, or a free hosted-model API key):
 
 ```bash
-export MSAFARA_LLM_PROVIDER=ollama MSAFARA_MODEL=qwen2.5:7b   # or: export MSAFARA_LLM_KEY=...
+export MSAFARA_LLM_PROVIDER=ollama MSAFARA_MODEL=qwen2.5:7b   # or a hosted key: see msafara/README.md
 bash scripts/run_prompt_eval.sh
 ```
 
@@ -147,7 +147,8 @@ The full FastAPI server, Trip Desk page and seeded demo database are not publish
 |---|---|
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Outbound email dispatch (`dispatch.py`) |
 | `IMAP_HOST` / `IMAP_USER` / `IMAP_PASSWORD` | Inbound email polling (`inbox_poll.py`) |
-| `MSAFARA_LLM_KEY`, `MSAFARA_LLM_PROVIDER`, `MSAFARA_MODEL` | Optional model backend for the Msafara workflow; unset runs the rules engine |
+| `LLM_API_KEY`, `LLM_API_URL`, `LLM_API_HEADERS`, `MSAFARA_MODEL` | Optional primary model backend (any messages-style API); unset runs the rules engine |
+| `MSAFARA_LLM_PROVIDER`, `MSAFARA_LLM_KEY`, `MSAFARA_HOSTED_URL`, `MSAFARA_HOSTED_MODEL` | Optional free backends: local Ollama, or a hosted free-tier key |
 
 ## How it was built
 

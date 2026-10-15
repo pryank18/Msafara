@@ -57,7 +57,7 @@ Safe (the prototype shows it):
 * Eval harness: 25 synthetic trips, 6 metric families, rule-based checks + LLM-judge hook, pass rate logged per run; Pydantic-validated JSON outputs; versioned prompt files with a changelog.
 
 Not safe yet:
-* "Improved pass rate across prompt versions" for LLM prompts: not measured. To earn it, set `LLM_API_KEY` and run
+* "Improved pass rate across prompt versions" for LLM prompts: not measured. To earn it, set `LLM_API_KEY`, `LLM_API_URL` and `MSAFARA_MODEL` and run
   `MSAFARA_PROMPT_INTAKE=v1 python -m msafara.evals.run --label intake-v1` then the same with `v2`, then `--report`.
   Claim only what that table shows (the scores may well not improve).
 * "Vector search with neural embeddings" (it is hashing TF-IDF), pgvector/Supabase (not used), real vendors or real prices
@@ -85,7 +85,14 @@ A. Ollama, no account and no key (needs ~8 GB RAM; runs on your own machine):
 
 B. Free hosted-model API key (no card):
 
-    export MSAFARA_LLM_KEY=...       # keep out of the repo; .env is gitignored
+    export MSAFARA_LLM_KEY=...              # keep out of the repo; .env is gitignored
+    export MSAFARA_HOSTED_URL=...           # the provider's generate endpoint; may contain {model} and {key}
+    export MSAFARA_HOSTED_MODEL=...         # the model id your account lists
     bash scripts/run_prompt_eval.sh
+
+C. Any messages-style API (primary backend):
+
+    export LLM_API_KEY=... LLM_API_URL=... MSAFARA_MODEL=...
+    export LLM_API_HEADERS='{"header-name": "value"}'   # only if the endpoint needs extra headers
 
 Results are labelled with the model used and support only "ran prompt versions v1 and v2 on <that model>", not any claim about the default model.
