@@ -129,16 +129,71 @@ def test_hosted_adapter_parses_response(monkeypatch):
     from msafara import llm
     monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.setenv("MSAFARA_LLM_KEY", "k")
+    monkeypatch.setenv("MSAFARA_HOSTED_URL", "https://hosted.example/models/{model}:generate")
+    monkeypatch.setenv("MSAFARA_HOSTED_MODEL", "hosted-model-1")
     llm.set_client(None); llm.force_mock(False)
     payload = {"candidates": [{"content": {"parts": [{"text": '{"a": 1}'}]}}]}
+    seen = {}
     import urllib.request
-    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=0: io.BytesIO(json.dumps(payload).encode()))
+    def fake(req, timeout=0):
+        seen["url"] = req.full_url; seen["key"] = req.get_header("X-api-key")
+        return io.BytesIO(json.dumps(payload).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
     c = llm.get_client()
     assert isinstance(c, llm.HostedClient)
     r = c.messages.create(model=llm.DEFAULT_MODEL.split("-")[0] + "-x", max_tokens=10, system="s", messages=[{"role": "user", "content": "u"}])
     assert r.content[0].text == '{"a": 1}'
-    assert llm.backend_label() == "llm:" + llm.FREE_TIER_MODEL
+    assert seen["url"] == "https://hosted.example/models/hosted-model-1:generate" and seen["key"] == "k"
+    assert llm.backend_label() == "llm:hosted-model-1"
     llm.force_mock(False)
+
+
+def test_hosted_backend_incomplete_config_stays_in_rules_mode(monkeypatch):
+    from msafara import llm
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("MSAFARA_HOSTED_URL", raising=False)
+    monkeypatch.delenv("MSAFARA_LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("MSAFARA_LLM_KEY", "k")
+    llm.set_client(None); llm.force_mock(False)
+    assert llm.get_client() is None and llm.mock_mode()
+
+
+def test_primary_api_adapter(monkeypatch):
+    import io, json, urllib.request
+    from msafara import llm
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_API_URL", "https://primary.example/v1/messages")
+    monkeypatch.setenv("LLM_API_HEADERS", json.dumps({"api-version": "2023-06-01"}))
+    monkeypatch.setenv("MSAFARA_MODEL", "model-a")
+    llm.set_client(None); llm.force_mock(False)
+    seen = {}
+    def fake(req, timeout=0):
+        seen["url"] = req.full_url; seen["body"] = json.loads(req.data)
+        seen["key"] = req.get_header("X-api-key"); seen["ver"] = req.get_header("Api-version")
+        return io.BytesIO(json.dumps({"content": [{"type": "text", "text": '{"c": 3}'}]}).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    c = llm.get_client()
+    assert isinstance(c, llm.ApiClient)
+    r = c.messages.create(model=llm.DEFAULT_MODEL, max_tokens=7, system="s", messages=[{"role": "user", "content": "u"}])
+    assert r.content[0].text == '{"c": 3}'
+    assert seen["url"] == "https://primary.example/v1/messages" and seen["key"] == "secret" and seen["ver"] == "2023-06-01"
+    assert seen["body"] == {"model": "model-a", "max_tokens": 7, "system": "s", "messages": [{"role": "user", "content": "u"}]}
+    assert llm.backend_label() == "llm:model-a"
+
+
+def test_primary_api_failure_raises_output_error_for_fallback(monkeypatch):
+    import urllib.request
+    from msafara import llm
+    monkeypatch.setenv("LLM_API_KEY", "secret")
+    monkeypatch.setenv("LLM_API_URL", "https://primary.example/v1/messages")
+    monkeypatch.setenv("MSAFARA_MODEL", "model-a")
+    llm.set_client(None); llm.force_mock(False)
+    def boom(req, timeout=0):
+        raise OSError("down")
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    import pytest
+    with pytest.raises(llm.LLMOutputError):
+        llm.get_client().messages.create(model=llm.DEFAULT_MODEL, max_tokens=5, system="s", messages=[])
 
 
 def test_local_adapter(monkeypatch):

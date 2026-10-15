@@ -3,7 +3,16 @@
 * One chokepoint: `structured_call(agent, user, schema)` -> validated Pydantic object.
   Output is parsed as JSON, validated against the schema, and retried once with the
   validation error fed back. Failure raises LLMOutputError (callers fall back / escalate).
-* No LLM_API_KEY (or other backend) -> `mock_mode()` is True and agents use their rule-based paths.
+* Every backend is configured from the environment, so no provider is hard-coded here:
+  - Primary backend: LLM_API_KEY + LLM_API_URL (a messages-style endpoint: JSON body with
+    model, max_tokens, system, messages; response with content[].text). Extra request headers
+    the endpoint needs go in LLM_API_HEADERS as a JSON object. Model id: MSAFARA_MODEL.
+  - Local backend: MSAFARA_LLM_PROVIDER=local (LOCAL_LLM_HOST optional).
+  - Hosted backend: MSAFARA_LLM_KEY + MSAFARA_HOSTED_URL (a generateContent-style endpoint; may
+    contain {model} and {key}) + MSAFARA_HOSTED_MODEL. If the URL has no {key}, the key is sent in
+    the header named by MSAFARA_HOSTED_KEY_HEADER (default x-api-key).
+* No backend configured (or an incomplete one) -> `mock_mode()` is True and agents use their
+  rule-based paths.
 * `set_client()` lets tests inject a stub with the same `.messages.create` surface.
 * Prompts are versioned files in msafara/prompts/<agent>_v<N>.md. `active.json` picks
   the version; env MSAFARA_PROMPT_<AGENT>=v2 overrides it per run (used by evals).
@@ -17,6 +26,7 @@ from typing import Optional, Type, TypeVar
 from pydantic import BaseModel, ValidationError
 
 PROMPTS = Path(__file__).parent / "prompts"
+# Placeholder model id meaning "whatever model the active backend is configured with".
 DEFAULT_MODEL = "primary-default"
 FREE_TIER_MODEL = "hosted-default"
 T = TypeVar("T", bound=BaseModel)
@@ -48,14 +58,30 @@ def _primary_key() -> str:
     return os.environ.get("LLM_API_KEY", "")
 
 
+def _primary_url() -> str:
+    return os.environ.get("LLM_API_URL", "").strip()
+
+
+def _primary_ready() -> bool:
+    return bool(_primary_key() and _primary_url())
+
+
 def _is_default_family(model: str) -> bool:
-    """True when `model` belongs to the default model family (swapped for the backend's own model)."""
-    return model.split("-")[0] == DEFAULT_MODEL.split("-")[0]
+    """True when `model` is a placeholder id, to be swapped for the backend's configured model."""
+    return model in (DEFAULT_MODEL, FREE_TIER_MODEL) or model.split("-")[0] == DEFAULT_MODEL.split("-")[0]
 
 
 def _llm_key() -> str:
-    """Generic key name first; legacy names still work."""
-    return os.environ.get("MSAFARA_LLM_KEY") or os.environ.get("MSAFARA_LLM_KEY") or os.environ.get("MSAFARA_LLM_KEY") or ""
+    return os.environ.get("MSAFARA_LLM_KEY", "")
+
+
+def _hosted_model() -> str:
+    m = os.environ.get("MSAFARA_HOSTED_MODEL") or os.environ.get("MSAFARA_MODEL") or ""
+    return m if m and not _is_default_family(m) else ""
+
+
+def _hosted_ready() -> bool:
+    return bool(_llm_key() and os.environ.get("MSAFARA_HOSTED_URL") and _hosted_model())
 
 
 def get_client():
@@ -63,12 +89,11 @@ def get_client():
         return None
     if _client is not None:
         return _client
-    if _primary_key():
-        pass
+    if _primary_ready():
         return ApiClient()
     if _provider() == "local":
         return LocalClient()
-    if _llm_key():
+    if _hosted_ready():
         return HostedClient()
     return None
 
@@ -81,6 +106,43 @@ class _Block:
 class _Resp:
     def __init__(self, text):
         self.content = [_Block(text)]
+
+
+def _post_json(url: str, body: dict, headers: dict, timeout: int) -> dict:
+    import urllib.request
+    req = urllib.request.Request(url, data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json", **headers})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+class ApiClient:
+    """Primary backend: a messages-style HTTP endpoint configured entirely from the environment."""
+
+    def __init__(self):
+        self.key = _primary_key()
+        self.url = _primary_url()
+        try:
+            self.extra_headers = json.loads(os.environ.get("LLM_API_HEADERS") or "{}")
+        except ValueError:
+            self.extra_headers = {}
+        self.messages = self
+
+    def create(self, model, max_tokens, system, messages, **_):
+        if _is_default_family(model):
+            model = os.environ.get("MSAFARA_MODEL", "")
+        if not model or _is_default_family(model):
+            raise LLMOutputError("MSAFARA_MODEL is not set for the primary backend")
+        headers = {"x-api-key": self.key, **{str(k): str(v) for k, v in self.extra_headers.items()}}
+        body = {"model": model, "max_tokens": max_tokens, "system": system, "messages": list(messages)}
+        try:
+            data = _post_json(self.url, body, headers, timeout=120)
+        except LLMOutputError:
+            raise
+        except Exception as e:  # network or HTTP error: let callers fall back
+            raise LLMOutputError(f"primary backend request failed: {str(e)[:200]}") from e
+        text = "".join(b.get("text", "") for b in (data.get("content") or []) if isinstance(b, dict))
+        return _Resp(text)
 
 
 class LocalClient:
@@ -110,19 +172,21 @@ class LocalClient:
 
 
 class HostedClient:
-    """Free-tier alternative backend (free hosted-model API key). Mimics `messages.create`.
+    """Free-tier hosted backend (generateContent-style endpoint), configured from the environment.
 
     Results from this backend must be labelled with its own model id, never as the default model.
-    Set MSAFARA_MODEL to this backend's model id (default FREE_TIER_MODEL).
     """
     def __init__(self):
         self.key = _llm_key()
+        self.url_template = os.environ.get("MSAFARA_HOSTED_URL", "")
+        self.key_header = os.environ.get("MSAFARA_HOSTED_KEY_HEADER", "x-api-key")
         self.messages = self
 
     def create(self, model, max_tokens, system, messages, **_):
+        import urllib.parse
         import urllib.request
         if _is_default_family(model):
-            model = FREE_TIER_MODEL
+            model = _hosted_model()
         body = {
             "systemInstruction": {"parts": [{"text": system}]},
             "contents": [{"role": "model" if m["role"] == "assistant" else "user",
@@ -131,12 +195,11 @@ class HostedClient:
                                  "responseMimeType": "application/json"},
         }
         headers = {"Content-Type": "application/json"}
-        if self.key.startswith("AQ."):
-            # Express-mode key format (not a standard "AIza..." key)
-            url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{model}:generateContent?key={self.key}"
+        url = self.url_template.replace("{model}", urllib.parse.quote(model, safe=""))
+        if "{key}" in url:
+            url = url.replace("{key}", urllib.parse.quote(self.key, safe=""))
         else:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-            headers["x-goog-api-key"] = self.key
+            headers[self.key_header] = self.key
         req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
         with urllib.request.urlopen(req, timeout=60) as r:
             data = json.loads(r.read())
@@ -151,12 +214,11 @@ def mock_mode() -> bool:
 def backend_label() -> str:
     if mock_mode():
         return "deterministic rules engine (no model connected)"
-    if _client is None and not _primary_key():
+    if _client is None and not _primary_ready():
         if _provider() == "local":
             m = os.environ.get("MSAFARA_MODEL", LocalClient.default_model)
             return f"llm:local/{m if not _is_default_family(m) else LocalClient.default_model}"
-        m = os.environ.get("MSAFARA_MODEL", FREE_TIER_MODEL)
-        return f"llm:{m if not _is_default_family(m) else FREE_TIER_MODEL}"
+        return f"llm:{_hosted_model() or FREE_TIER_MODEL}"
     return f"llm:{os.environ.get('MSAFARA_MODEL', DEFAULT_MODEL)}"
 
 
