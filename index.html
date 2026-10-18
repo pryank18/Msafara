@@ -148,6 +148,7 @@
   textarea { min-height: 70px; resize: vertical; }
   .row-fields { display: flex; gap: 12px; }
   .row-fields > div { flex: 1; }
+  .row-fields > div > label:first-child { margin-top: 14px; }
   button.primary {
     margin-top: 22px; background: var(--accent); color: #1A1305; border: none;
     padding: 11px 20px; border-radius: 5px; font-size: 14px; font-weight: 650; cursor: pointer;
@@ -201,7 +202,15 @@
   .split-col li { font-size: 13.5px; margin-bottom: 10px; line-height: 1.5; color: var(--text); }
   .split-col li .li-sub { color: var(--text-muted); font-size: 12.5px; display: block; margin-top: 1px; }
   code { background: var(--surface-raised); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-size: 12.5px; }
-  #toast-stack { position: fixed; bottom: 24px; right: 24px; z-index: 20; display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
+  input.invalid, select.invalid, textarea.invalid { border-color: var(--danger); background: var(--danger-dim); }
+  .field-error { color: var(--danger); font-size: 12px; margin-top: 4px; min-height: 0; }
+  .field-error:empty { display: none; }
+  .sender-box { border: 1px dashed var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 6px; }
+  .sender-box summary { cursor: pointer; font-size: 13px; color: var(--text-muted); }
+  .preview-msg { white-space: pre-wrap; min-height: 220px; font-size: 13.5px; line-height: 1.55; }
+  .preview-meta { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+  .demo-note { font-size: 12.5px; color: var(--text-muted); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 5px; padding: 8px 12px; margin-bottom: 16px; }
+  #toast-stack { position: fixed; bottom: 72px; right: 24px; z-index: 20; display: flex; flex-direction: column; gap: 10px; max-width: 380px; }
   body[dir="rtl"] #toast-stack { right: auto; left: 24px; }
   .toast { background: var(--surface-raised); border: 1px solid var(--border); border-left: 3px solid var(--info); border-radius: 6px; padding: 12px 16px; font-size: 13px; line-height: 1.5; white-space: pre-line; animation: toastIn 0.18s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
   body[dir="rtl"] .toast { border-left: 1px solid var(--border); border-right: 3px solid var(--info); }
@@ -257,6 +266,7 @@
   <div class="panel active" id="panel-queue">
     <h1 data-i18n="queue_title">Open requests</h1>
     <p class="subtitle" data-i18n="queue_subtitle">Every vendor request, current status, last updated.</p>
+    <div class="demo-note" id="demo-note" style="display:none;">Demo mode: vendor replies are parsed by rule-based mock logic in your browser. Try it: open <b>REQ-1002</b>, paste <i>"Best we can do is $2,000 per person, final."</i> and watch the agent decide.</div>
     <div class="stats-strip" id="stats-strip"></div>
     <div id="queue-actions" style="margin-bottom: 18px;">
       <button class="secondary" onclick="runCheck()" data-i18n="btn_run_check">Run check (timeout + expiring holds)</button>
@@ -275,27 +285,40 @@
     <h1 data-i18n="new_title">New vendor request</h1>
     <p class="subtitle" data-i18n="new_subtitle">Draft and send a request to a single vendor.</p>
     <div class="card">
-      <label data-i18n="f_vendor_name">Vendor name</label><input id="nr-vendor-name" placeholder="e.g. Amara">
+      <details class="sender-box" id="sender-box">
+        <summary id="sender-summary">Sending as</summary>
+        <label>Your company</label><input id="sp-company" placeholder="Kilele Journeys">
+        <label>Your name</label><input id="sp-name" placeholder="Amina Mushi">
+        <label>Signature (role, phone)</label><input id="sp-signature" placeholder="Operations Lead · +255 700 000 999">
+      </details>
+      <label data-i18n="f_vendor_name">Vendor name</label><input id="nr-vendor-name" placeholder="e.g. Serengeti Plains Camp">
+      <div class="field-error" id="err-nr-vendor-name"></div>
       <label data-i18n="f_channel">Contact channel</label>
       <select id="nr-vendor-channel" onchange="updateAddressPlaceholder('nr')">
         <option value="email" data-i18n="channel_email">email</option>
         <option value="whatsapp" data-i18n="channel_whatsapp">WhatsApp</option>
       </select>
-      <label data-i18n="f_contact_address">Contact address</label><input id="nr-vendor-address" placeholder="amara@example.com">
+      <label data-i18n="f_contact_address">Contact address</label><input id="nr-vendor-address" placeholder="reservations@example.com">
+      <div class="field-error" id="err-nr-vendor-address"></div>
       <label data-i18n="f_category">Category</label>
       <select id="nr-category">
         <option value="accommodation" data-i18n="cat_accommodation">accommodation</option>
         <option value="transport" data-i18n="cat_transport">transport</option>
         <option value="activity" data-i18n="cat_activity">activity</option>
       </select>
-      <label data-i18n="f_description">Description</label><input id="nr-description" placeholder="15 rooms, 3-star, Stone Town">
-      <label data-i18n="f_dates">Dates</label><input id="nr-dates" placeholder="2026-06-05 to 2026-06-08">
+      <label data-i18n="f_description">Description</label><input id="nr-description" placeholder="4 tents, full board, central Serengeti">
+      <div class="field-error" id="err-nr-description"></div>
       <div class="row-fields">
-        <div><label data-i18n="f_quantity">Quantity</label><input id="nr-quantity" type="number"></div>
-        <div><label data-i18n="f_budget_min">Budget min</label><input id="nr-budget-min" type="number"></div>
-        <div><label data-i18n="f_budget_max">Budget max</label><input id="nr-budget-max" type="number"></div>
+        <div><label>Start date</label><input id="nr-date-start" type="date"><div class="field-error" id="err-nr-date-start"></div></div>
+        <div><label>End date (optional)</label><input id="nr-date-end" type="date"><div class="field-error" id="err-nr-date-end"></div></div>
       </div>
-      <button class="primary" onclick="createRequest()" data-i18n="btn_send_request">Send request</button>
+      <label>Group / guest notes (optional)</label><input id="nr-guests" placeholder="12 guests, honeymoon couple, 2 vegetarians">
+      <div class="row-fields">
+        <div><label data-i18n="f_quantity">Quantity</label><input id="nr-quantity" type="number" min="1"><div class="field-error" id="err-nr-quantity"></div></div>
+        <div><label data-i18n="f_budget_min">Budget min</label><input id="nr-budget-min" type="number" min="0"><div class="field-error" id="err-nr-budget-min"></div></div>
+        <div><label data-i18n="f_budget_max">Budget max</label><input id="nr-budget-max" type="number" min="0"><div class="field-error" id="err-nr-budget-max"></div></div>
+      </div>
+      <button class="primary" onclick="previewRequest()">Preview message</button>
     </div>
   </div>
   <div class="panel" id="panel-sourcing">
@@ -809,7 +832,8 @@ async function openRequest(id) {
       <textarea id="reply-text" placeholder="${t('modal_reply_ph')}"></textarea>
       <button class="primary" onclick="submitReply()">${t("modal_process_reply")}</button>
       <div style="margin-top:10px;">
-        <button class="secondary" onclick="lockRequest()">${t("modal_lock")}</button>
+        ${d.status === "confirmed" ? `<button class="secondary" onclick="lockRequest()">${t("modal_lock")}</button>` : ""}
+        ${(d.status === "escalated" || d.status === "negotiating") && d.latest_parsed_result && d.latest_parsed_result.rate ? `<button class="secondary" onclick="lockRequest()">Accept $${esc(d.latest_parsed_result.rate)} offer</button>` : ""}
         <button class="secondary" onclick="showReviseForm()">${t("modal_revise")}</button>
       </div>
       <div id="revise-form" style="display:none; margin-top:12px;">
@@ -822,6 +846,9 @@ async function openRequest(id) {
   document.getElementById("modal-backdrop").classList.add("active");
 }
 function closeModal() { document.getElementById("modal-backdrop").classList.remove("active"); }
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && document.getElementById("modal-backdrop").classList.contains("active")) closeModal();
+});
 async function submitReply() {
   const text = document.getElementById("reply-text").value;
   if (!text.trim()) return;
@@ -866,31 +893,169 @@ async function submitRevise() {
     toast("Network error — could not reach the server.", "error");
   }
 }
-async function createRequest() {
-  const vendorName = val("nr-vendor-name").trim();
-  const vendorAddress = val("nr-vendor-address").trim();
-  const description = val("nr-description").trim();
-  const dates = val("nr-dates").trim();
-  if (!vendorName || !vendorAddress || !description || !dates) {
-    toast("Vendor name, contact address, description, and dates are required.", "warn");
-    return;
+/* ---- Sender profile (per-browser convenience) ---- */
+const SENDER_KEY = "msafara_sender_v1";
+const SENDER_DEFAULT = { company: "Kilele Journeys", name: "Amina Mushi", signature: "Operations Lead · +255 700 000 999" };
+function loadSender() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(SENDER_KEY) || "null"); } catch (e) {}
+  s = Object.assign({}, SENDER_DEFAULT, s || {});
+  document.getElementById("sp-company").value = s.company;
+  document.getElementById("sp-name").value = s.name;
+  document.getElementById("sp-signature").value = s.signature;
+  updateSenderSummary();
+}
+function currentSender() {
+  return { company: val("sp-company").trim(), name: val("sp-name").trim(), signature: val("sp-signature").trim() };
+}
+function saveSender() {
+  try { localStorage.setItem(SENDER_KEY, JSON.stringify(currentSender())); } catch (e) {}
+}
+function updateSenderSummary() {
+  const s = currentSender();
+  document.getElementById("sender-summary").textContent = `Sending as ${s.name || "—"}, ${s.company || "—"} (edit)`;
+}
+["sp-company", "sp-name", "sp-signature"].forEach(id => document.getElementById(id).addEventListener("input", () => { updateSenderSummary(); saveSender(); }));
+
+/* ---- Validation ---- */
+function normAddress(channel, raw) {
+  const a = String(raw || "").trim();
+  return channel === "whatsapp" ? a.replace(/[\s()-]/g, "") : a;
+}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_RE = /^\+[1-9]\d{7,14}$/;
+function setErr(id, msg) {
+  const input = document.getElementById(id);
+  const slot = document.getElementById("err-" + id);
+  if (input) input.classList.toggle("invalid", !!msg);
+  if (slot) slot.textContent = msg || "";
+  return !msg;
+}
+function clearErrs(ids) { ids.forEach(id => setErr(id, "")); }
+function validateRequestForm() {
+  const ids = ["nr-vendor-name", "nr-vendor-address", "nr-description", "nr-date-start", "nr-date-end", "nr-quantity", "nr-budget-min", "nr-budget-max"];
+  clearErrs(ids);
+  let ok = true;
+  const channel = val("nr-vendor-channel");
+  const address = normAddress(channel, val("nr-vendor-address"));
+  if (!val("nr-vendor-name").trim()) ok = setErr("nr-vendor-name", "Add the vendor's name.") && ok;
+  if (!address) ok = setErr("nr-vendor-address", "Add an email or WhatsApp number.") && ok;
+  else if (channel === "email" && !EMAIL_RE.test(address)) ok = setErr("nr-vendor-address", "That isn't a valid email address.") && ok;
+  else if (channel === "whatsapp" && !PHONE_RE.test(address)) ok = setErr("nr-vendor-address", "Use international format, e.g. +255712345678.") && ok;
+  if (!val("nr-description").trim()) ok = setErr("nr-description", "Describe what you need, e.g. 4 tents, full board.") && ok;
+  const start = val("nr-date-start"), end = val("nr-date-end");
+  const today = new Date().toISOString().slice(0, 10);
+  if (!start) ok = setErr("nr-date-start", "Pick a start date.") && ok;
+  else if (start < today) ok = setErr("nr-date-start", "Start date is in the past.") && ok;
+  if (end && start && end < start) ok = setErr("nr-date-end", "End date is before the start date.") && ok;
+  const qty = val("nr-quantity");
+  if (qty && (!Number.isInteger(+qty) || +qty < 1)) ok = setErr("nr-quantity", "Quantity must be 1 or more.") && ok;
+  const bmin = floatOrNull("nr-budget-min"), bmax = floatOrNull("nr-budget-max");
+  if (bmin !== null && bmin < 0) ok = setErr("nr-budget-min", "Budget can't be negative.") && ok;
+  if (bmax !== null && bmax < 0) ok = setErr("nr-budget-max", "Budget can't be negative.") && ok;
+  if (bmin !== null && bmax !== null && bmin > bmax) ok = setErr("nr-budget-min", `Minimum ($${bmin}) is above the maximum ($${bmax}).`) && ok;
+  if (!ok) {
+    const first = document.querySelector("#panel-new .invalid");
+    if (first) { first.scrollIntoView({ block: "center", behavior: "smooth" }); first.focus(); }
   }
+  return ok;
+}
+["nr-vendor-name", "nr-vendor-address", "nr-description", "nr-date-start", "nr-date-end", "nr-quantity", "nr-budget-min", "nr-budget-max"]
+  .forEach(id => document.getElementById(id).addEventListener("input", () => setErr(id, "")));
+
+/* ---- Drafting ---- */
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function niceDate(s) { const [y, m, d] = s.split("-").map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; }
+function niceRange(start, end) {
+  if (!end || end === start) return niceDate(start);
+  const [y1, m1, d1] = start.split("-").map(Number), [y2, m2, d2] = end.split("-").map(Number);
+  if (y1 === y2 && m1 === m2) return `${d1}–${d2} ${MONTHS[m1 - 1]} ${y1}`;
+  if (y1 === y2) return `${d1} ${MONTHS[m1 - 1]} – ${d2} ${MONTHS[m2 - 1]} ${y1}`;
+  return `${niceDate(start)} – ${niceDate(end)}`;
+}
+const RATE_ASK = {
+  accommodation: "your best rate per room per night, and whether breakfast or meals are included",
+  transport: "your rate per vehicle per day, and what's included (driver, fuel, park fees)",
+  activity: "your per-person price and what's included"
+};
+function draftRequestMessage(f, sender) {
+  const desc = f.description.replace(/\.$/, "");
+  const qtyAlreadyInDesc = f.quantity && new RegExp(`\\b${f.quantity}\\b`).test(desc);
+  const qtyLine = f.quantity && !qtyAlreadyInDesc ? ` (${f.quantity} in total)` : "";
+  const isWa = f.channel === "whatsapp";
+  const greet = isWa ? `Hi ${f.vendorName} team,` : `Dear ${f.vendorName} team,`;
+  const intro = sender.name || sender.company
+    ? `This is ${sender.name || "the reservations team"}${sender.company ? ` from ${sender.company}` : ""}.`
+    : "";
+  const ask = `We'd like to book ${desc}${qtyLine} for ${niceRange(f.start, f.end)}.`;
+  const guests = f.guests ? `It's for ${f.guests.replace(/\.$/, "")}.` : "";
+  const rate = `Could you confirm availability and ${RATE_ASK[f.category] || "your best rate"}?`;
+  const flex = "If the exact dates or setup don't work, please tell us what you can offer instead.";
+  const sign = isWa
+    ? `Thanks!\n${sender.name || ""}${sender.company ? `, ${sender.company}` : ""}`.trim()
+    : `Kind regards,\n${[sender.name, sender.signature, sender.company].filter(Boolean).join("\n")}`;
+  return [greet, "", [intro, ask, guests].filter(Boolean).join(" "), "", rate + " " + flex, "", sign].join("\n");
+}
+function readRequestForm() {
+  return {
+    vendorName: val("nr-vendor-name").trim(), channel: val("nr-vendor-channel"),
+    address: normAddress(val("nr-vendor-channel"), val("nr-vendor-address")), category: val("nr-category"),
+    description: val("nr-description").trim(), start: val("nr-date-start"), end: val("nr-date-end"),
+    guests: val("nr-guests").trim(), quantity: intOrNull("nr-quantity"),
+    budget_min: floatOrNull("nr-budget-min"), budget_max: floatOrNull("nr-budget-max")
+  };
+}
+let pendingRequest = null;
+function previewRequest() {
+  if (!validateRequestForm()) { toast("Fix the highlighted fields first.", "warn", 3000); return; }
+  const f = readRequestForm();
+  const sender = currentSender();
+  saveSender();
+  pendingRequest = f;
+  const budget = f.budget_min !== null || f.budget_max !== null
+    ? ` · internal budget ${f.budget_min !== null ? "$" + f.budget_min : "—"}–${f.budget_max !== null ? "$" + f.budget_max : "—"} (not shown to vendor)` : "";
+  document.getElementById("modal-content").innerHTML = `
+    <h2>Check before sending</h2>
+    <div class="preview-meta">To <b>${esc(f.vendorName)}</b> via ${esc(f.channel === "whatsapp" ? "WhatsApp" : "email")} · ${esc(f.address)}${esc(budget)}</div>
+    <label>Message (edit anything before it goes)</label>
+    <textarea id="preview-text" class="preview-msg">${esc(draftRequestMessage(f, sender))}</textarea>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="primary" id="btn-confirm-send" onclick="sendPendingRequest()">Send to vendor</button>
+      <button class="secondary" style="margin-top:22px;" onclick="closeModal()">Back to edit</button>
+    </div>
+  `;
+  document.getElementById("modal-backdrop").classList.add("active");
+  document.getElementById("preview-text").focus();
+}
+async function sendPendingRequest() {
+  const f = pendingRequest;
+  if (!f) return;
+  const message = document.getElementById("preview-text").value.trim();
+  if (!message) { toast("The message is empty.", "warn"); return; }
+  const btn = document.getElementById("btn-confirm-send");
+  btn.classList.add("loading");
   const body = {
-    vendor: {name: vendorName, contact_channel: val("nr-vendor-channel"), contact_address: vendorAddress},
+    vendor: { name: f.vendorName, contact_channel: f.channel, contact_address: f.address },
     need: {
-      category: val("nr-category"), description: description, dates: dates,
-      quantity: intOrNull("nr-quantity"), budget_min: floatOrNull("nr-budget-min"), budget_max: floatOrNull("nr-budget-max")
-    }
+      category: f.category, description: f.description,
+      dates: f.end && f.end !== f.start ? `${f.start} to ${f.end}` : f.start,
+      quantity: f.quantity, budget_min: f.budget_min, budget_max: f.budget_max, guest_notes: f.guests || null
+    },
+    message
   };
   try {
     const res = await fetch(API + "/api/requests", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
     if (!res.ok) { toast((await res.json()).detail || "Failed to create request.", "error"); return; }
     const created = await res.json();
-    ["nr-vendor-name","nr-vendor-address","nr-description","nr-dates","nr-quantity","nr-budget-min","nr-budget-max"].forEach(id => document.getElementById(id).value = "");
-    toast(`${created.request_id} sent to ${esc(vendorName)}.`, "success");
+    ["nr-vendor-name","nr-vendor-address","nr-description","nr-date-start","nr-date-end","nr-guests","nr-quantity","nr-budget-min","nr-budget-max"].forEach(id => document.getElementById(id).value = "");
+    pendingRequest = null;
+    closeModal();
+    toast(`${created.request_id} sent to ${f.vendorName}.`, "success");
     document.querySelector('[data-panel="queue"]').click();
   } catch (e) {
     toast("Network error — could not reach the server.", "error");
+  } finally {
+    btn.classList.remove("loading");
   }
 }
 function val(id) { return document.getElementById(id).value; }
@@ -917,6 +1082,10 @@ async function createSourcing() {
   const dates = val("ns-dates").trim();
   if (!description || !dates) { toast("Description and dates are required.", "warn"); return; }
   if (vendors.length < 2) { toast("Add at least 2 vendors for competitive sourcing.", "warn"); return; }
+  const badVendor = vendors.find(v => v.contact_channel === "email" ? !EMAIL_RE.test(v.contact_address) : !PHONE_RE.test(normAddress("whatsapp", v.contact_address)));
+  if (badVendor) { toast(`Check the contact for ${badVendor.name}: ${badVendor.contact_channel === "email" ? "not a valid email" : "use +country format, e.g. +255712345678"}.`, "warn"); return; }
+  const sMin = floatOrNull("ns-budget-min"), sMax = floatOrNull("ns-budget-max");
+  if (sMin !== null && sMax !== null && sMin > sMax) { toast(`Budget minimum ($${sMin}) is above the maximum ($${sMax}).`, "warn"); return; }
   const body = {
     need: {
       category: val("ns-category"), description: description, dates: dates,
@@ -1072,6 +1241,8 @@ async function generateProposal() {
     toast("Network error — could not reach the server.", "error");
   }
 }
+loadSender();
+if (window.MSAFARA_DEMO) document.getElementById("demo-note").style.display = "block";
 setLang("en");
 </script>
 <!-- portfolio-bar: links back to hub + Notion case study -->

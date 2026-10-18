@@ -6,7 +6,8 @@
 (function () {
   if (!/github\.io$/.test(location.hostname) && !/[?&]demo=1/.test(location.search)) return;
 
-  const KEY = "msafara_demo_v1";
+  const KEY = "msafara_demo_v2";
+  window.MSAFARA_DEMO = true;
   const realFetch = window.fetch.bind(window);
   const H = 3600 * 1000;
   const iso = ms => new Date(ms).toISOString().slice(0, 19);
@@ -124,11 +125,35 @@
   const find = id => db.reqs.find(r => r.request_id === id);
   const touch = r => { r.updated_at = iso(now()); };
 
+  const FINAL_RE = /(best (we|i) can do|final (offer|price|rate)|(that'?s|is) (our|my) final|our lowest|lowest (we|i) can|can'?t go (any )?lower|cannot go (any )?lower|no (more )?flexibility|take it or leave it|last price)/;
+
+  function lastCounter(r) {
+    for (let i = r.message_history.length - 1; i >= 0; i--) {
+      const mm = r.message_history[i];
+      if (mm.direction !== "outbound") continue;
+      const hit = mm.content.replace(/,/g, "").match(/budget (?:for this (?:group|booking) )?is \$(\d+(?:\.\d+)?)/i);
+      if (hit) return parseFloat(hit[1]);
+    }
+    return null;
+  }
+
   function parseReply(r, text) {
     const s = text.toLowerCase();
     const m = text.replace(/,/g, "").match(/\$?\s*(\d{2,6}(?:\.\d+)?)/);
     const rate = m ? parseFloat(m[1]) : null;
+    const max = r.need.budget_max;
     r.message_history.push({ direction: "inbound", content: text, timestamp: iso(now()) });
+    // A stated final offer ends negotiation: the agent never counters it again.
+    if (rate !== null && FINAL_RE.test(s)) {
+      r.latest_parsed_result = { rate, available: true, alternative_offer: null };
+      if (!max || rate <= max) {
+        r.status = "confirmed"; r.escalation_reason = null; r.hold_expires_at = iso(now() + 48 * H);
+      } else {
+        r.status = "escalated";
+        r.escalation_reason = `Vendor says $${rate} is their final offer ($${rate - max} over the $${max} budget). The agent stopped negotiating — accept it or walk away.`;
+      }
+      return;
+    }
     if (/(fully booked|not available|unavailable|no availability|cannot|can't|sorry)/.test(s)) {
       r.status = "declined";
       r.latest_parsed_result = { rate: null, available: false, alternative_offer: null };
@@ -145,18 +170,22 @@
       r.escalation_reason = "Couldn't find a clear rate or yes/no in the reply.";
       return;
     }
-    const max = r.need.budget_max;
     if (max && rate > max) {
+      r.latest_parsed_result = { rate, available: true, alternative_offer: null };
+      const prev = lastCounter(r);
+      const counter = Math.round(max * (r.negotiation_rounds === 0 ? 0.97 : 1));
       if (r.negotiation_rounds >= 2) {
         r.status = "escalated";
         r.escalation_reason = `Still $${rate} after ${r.negotiation_rounds} counter-offers (budget $${max}). Walk-away decision needed.`;
+      } else if (prev !== null && counter <= prev) {
+        // We've already offered our ceiling; repeating it would just stall the thread.
+        r.status = "escalated";
+        r.escalation_reason = `Vendor moved to $${rate}; we already offered $${prev}, our ceiling. Accept $${rate}, raise the budget, or walk away.`;
       } else {
         r.negotiation_rounds += 1;
         r.status = "negotiating";
-        const counter = Math.round(max * (r.negotiation_rounds === 1 ? 0.97 : 1));
         r.message_history.push({ direction: "outbound", content: `Thank you for the quote. Our budget for this booking is $${counter}. Could you meet us at that rate?`, timestamp: iso(now()) });
       }
-      r.latest_parsed_result = { rate, available: true, alternative_offer: null };
       return;
     }
     r.status = "confirmed";
@@ -169,12 +198,13 @@
     const map = {};
     db.reqs.forEach(r => {
       const k = r.vendor.contact_address;
-      const v = map[k] || (map[k] = { name: r.vendor.name, contact_channel: r.vendor.contact_channel, category: r.need.category, total_requests: 0, confirmed: 0, last_used_at: "" });
+      const v = map[k] || (map[k] = { name: r.vendor.name, contact_channel: r.vendor.contact_channel, category: r.need.category, total_requests: 0, confirmed: 0, decided: 0, last_used_at: "" });
       v.total_requests++;
       if (r.status === "confirmed") v.confirmed++;
+      if (r.status === "confirmed" || r.status === "declined") v.decided++;
       if (r.updated_at > v.last_used_at) v.last_used_at = r.updated_at;
     });
-    return Object.values(map).map(v => ({ ...v, last_used_at: v.last_used_at.replace("T", " "), confirm_rate: v.total_requests ? v.confirmed / v.total_requests : null }));
+    return Object.values(map).map(v => ({ ...v, last_used_at: v.last_used_at.replace("T", " "), confirm_rate: v.decided ? v.confirmed / v.decided : null }));
   }
 
   function proposalDoc(body) {
@@ -198,7 +228,7 @@
     if (path === "/api/requests" && method === "POST") {
       const r = {
         request_id: "REQ-" + db.seq++, vendor: body.vendor, need: body.need, status: "sent",
-        message_history: [{ direction: "outbound", content: `Hello ${body.vendor.name}, we'd like to request: ${body.need.description} for ${body.need.dates}${body.need.quantity ? ` (quantity ${body.need.quantity})` : ""}. Could you confirm availability and your best rate?`, timestamp: iso(now()) }],
+        message_history: [{ direction: "outbound", content: (body.message && String(body.message).trim()) || `Dear ${body.vendor.name} team,\n\nWe'd like to book ${body.need.description} for ${body.need.dates}. Could you confirm availability and your best rate?\n\nKind regards,\nReservations team`, timestamp: iso(now()) }],
         latest_parsed_result: null, escalation_reason: null, follow_up_count: 0, negotiation_rounds: 0, hold_expires_at: null
       };
       touch(r); db.reqs.push(r); save();
@@ -300,7 +330,8 @@
   document.addEventListener("DOMContentLoaded", () => {
     const bar = document.createElement("div");
     bar.style.cssText = "position:fixed;top:12px;right:12px;z-index:50;background:#1f2937;color:#e5e7eb;border:1px solid #374151;border-radius:8px;padding:8px 12px;font:12px/1.4 system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.25)";
-    bar.innerHTML = 'Live demo · sample trip data runs in your browser · <a href="?reset=1" style="color:#f59e0b">reset</a>';
+    if (window.innerWidth < 820) bar.style.cssText += ";top:auto;bottom:64px;left:12px;right:auto";
+    bar.innerHTML = 'Live demo · mock agent logic runs in your browser · <a href="?reset=1" style="color:#f59e0b">reset</a>';
     document.body.appendChild(bar);
   });
 })();
