@@ -5,7 +5,7 @@
 ![python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![langgraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C)
 ![rag](https://img.shields.io/badge/RAG-Chroma%20%C2%B7%20442%20chunks-F5A524)
-![tests](https://img.shields.io/badge/tests-74%20passing-2EA043)
+![tests](https://img.shields.io/badge/tests-88%20passing-2EA043)
 ![bound violations](https://img.shields.io/badge/bound%20violations-0-2EA043)
 ![llm](https://img.shields.io/badge/runs%20with-no%20API%20key-555)
 

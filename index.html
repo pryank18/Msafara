@@ -798,7 +798,9 @@ async function openRequest(id) {
   const messages = d.message_history.map(m => `
     <div class="msg ${m.direction}"><div class="dir">${esc(m.direction)}</div>${esc(m.content)}</div>
   `).join("");
-  const escalation = d.escalation_reason ? `<p style="color:var(--danger); font-size:13px;">${esc(d.escalation_reason)}</p>` : "";
+  const escalation = (d.escalation_reason ? `<p style="color:var(--danger); font-size:13px;">${esc(d.escalation_reason)}</p>` : "")
+    + (d.suggested_next_move ? `<p style="font-size:13px;"><strong>Suggested next move:</strong> ${esc(d.suggested_next_move)}</p>` : "")
+    + (d.agreed_note && d.status === "confirmed" ? `<p style="font-size:13px;">${esc(d.agreed_note)}</p>` : "");
   document.getElementById("modal-content").innerHTML = `
     <h2>${esc(d.request_id)}</h2>
     <div class="meta">${esc(d.vendor.name)} — ${esc(d.need.description)} (${esc(d.need.dates)}) ${statusPill(d.status)}</div>

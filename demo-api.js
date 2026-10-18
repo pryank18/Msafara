@@ -6,7 +6,7 @@
 (function () {
   if (!/github\.io$/.test(location.hostname) && !/[?&]demo=1/.test(location.search)) return;
 
-  const KEY = "msafara_demo_v1";
+  const KEY = "msafara_demo_v2";
   const realFetch = window.fetch.bind(window);
   const H = 3600 * 1000;
   const iso = ms => new Date(ms).toISOString().slice(0, 19);
@@ -43,7 +43,7 @@
           msg("outbound", "Thank you. Our budget for this group is $1,950 per person. With 12 climbers booked together, could you meet us at that rate?", 45)
         ],
         latest_parsed_result: { rate: 2150, available: true, alternative_offer: null },
-        escalation_reason: null, follow_up_count: 0, negotiation_rounds: 1,
+        escalation_reason: null, follow_up_count: 0, negotiation_rounds: 1, last_counter: 1950,
         hold_expires_at: null, updated_at: iso(t - 45 * H)
       },
       {
@@ -124,45 +124,114 @@
   const find = id => db.reqs.find(r => r.request_id === id);
   const touch = r => { r.updated_at = iso(now()); };
 
+  // Negotiation policy for the inbox. budget_max is the walk-away price: the most we pay without a human.
+  const POLICY = { autoAcceptPct: 3, maxCounters: 3, stuckLimit: 2, minStepPct: 1 };
+  const FIRM = /best (?:we|i) can (?:do|offer|go)|(?:our|my|the) (?:very )?(?:best|final|lowest|last)(?: possible)? (?:price|rate|offer|figure)|(?:can'?t|cannot|can not|unable to|won'?t) (?:go|come) (?:any )?(?:lower|down|further|below)|no (?:further|more) (?:discount|reduction|room|flexibility)|no flexibility|\bfinal\b|rock[- ]bottom|non[- ]negotiable|take it or leave it|that'?s (?:the )?(?:best|lowest)/i;
+  const DECLINE = /fully booked|sold out|not available|unavailable|no availability|cannot (?:accommodate|take|do (?:it|this|those))|can'?t (?:accommodate|take|do (?:it|this|those))|unable to (?:accommodate|take|help)|regret/i;
+  const PARTIAL = /\bonly (?:have )?\d+\b|\bpartial\b|\binstead\b|\balternative\b/i;
+  const money = n => "$" + Math.round(n).toLocaleString("en-US");
+
+  function priceIn(text) {
+    const t = text.replace(/(\d),(\d{3})/g, "$1$2");
+    const m = t.match(/\$\s?(\d+(?:\.\d+)?)/) || t.match(/(\d{2,6}(?:\.\d+)?)\s*(?:usd|dollars|per |pp\b|\/)/i) || t.match(/\b(\d{3,6}(?:\.\d+)?)\b/);
+    return m ? parseFloat(m[1]) : null;
+  }
+
+  function lastCounter(r) {
+    if (r.last_counter != null) return r.last_counter;
+    // older saved data: recover our last ask from the thread
+    for (let i = r.message_history.length - 1; i >= 0; i--) {
+      const h = r.message_history[i];
+      if (h.direction === "outbound" && /budget|rate of|meet us|propose/i.test(h.content)) { const p = priceIn(h.content); if (p) return p; }
+    }
+    return null;
+  }
+
+  // Our next ask, or null when there is no honest move left. Never repeats or lowers our own ask.
+  function nextCounter(r, rate, firm) {
+    const walk = r.need.budget_max, last = lastCounter(r);
+    const ceiling = Math.min(walk, rate - 1);
+    let next;
+    if (last == null) {                                                         // opening counter: mid-budget,
+      const mid = r.need.budget_min ? (r.need.budget_min + walk) / 2 : walk * 0.92; // leaving room to step up,
+      next = Math.max(mid, rate * 0.75);                                        // but never a >25% lowball
+    }
+    else if (firm) next = ceiling;                                              // their final word: our best answer
+    else next = (last + ceiling) / 2;                                           // step halfway up
+    next = Math.round(Math.min(next, ceiling));
+    if (last != null && next - last < walk * POLICY.minStepPct / 100) next = Math.round(ceiling);
+    if (last != null && next <= last) return null;
+    if (next >= rate) return null;
+    return next;
+  }
+
+  function escalate(r, reason, suggestion) {
+    r.status = "escalated";
+    r.escalation_reason = reason;
+    r.suggested_next_move = suggestion || null;
+  }
+
   function parseReply(r, text) {
     const s = text.toLowerCase();
-    const m = text.replace(/,/g, "").match(/\$?\s*(\d{2,6}(?:\.\d+)?)/);
-    const rate = m ? parseFloat(m[1]) : null;
+    const rate = priceIn(text);
+    const firm = FIRM.test(text);
+    const prevRate = r.latest_parsed_result && r.latest_parsed_result.rate;
     r.message_history.push({ direction: "inbound", content: text, timestamp: iso(now()) });
-    if (/(fully booked|not available|unavailable|no availability|cannot|can't|sorry)/.test(s)) {
+    r.suggested_next_move = null;
+    if (DECLINE.test(s) && rate === null) {
       r.status = "declined";
       r.latest_parsed_result = { rate: null, available: false, alternative_offer: null };
       return;
     }
-    if (/(only|partial|instead|alternative|but )/.test(s) && !/confirm/.test(s)) {
-      r.status = "escalated";
-      r.escalation_reason = "Reply offers partial availability or an alternative — needs a coordinator decision.";
+    if (PARTIAL.test(s) && !/confirm/.test(s)) {
+      escalate(r, "Reply offers partial availability or an alternative — needs a coordinator decision.",
+        "Ask the client whether the alternative works, then lock it or source the rest elsewhere.");
       r.latest_parsed_result = { rate, available: "partial", alternative_offer: text.slice(0, 120) };
       return;
     }
     if (rate === null) {
-      r.status = "escalated";
-      r.escalation_reason = "Couldn't find a clear rate or yes/no in the reply.";
+      escalate(r, "Couldn't find a clear rate or yes/no in the reply.", "Reply asking the vendor to confirm availability and a per-unit rate.");
       return;
     }
-    const max = r.need.budget_max;
-    if (max && rate > max) {
-      if (r.negotiation_rounds >= 2) {
-        r.status = "escalated";
-        r.escalation_reason = `Still $${rate} after ${r.negotiation_rounds} counter-offers (budget $${max}). Walk-away decision needed.`;
-      } else {
-        r.negotiation_rounds += 1;
-        r.status = "negotiating";
-        const counter = Math.round(max * (r.negotiation_rounds === 1 ? 0.97 : 1));
-        r.message_history.push({ direction: "outbound", content: `Thank you for the quote. Our budget for this booking is $${counter}. Could you meet us at that rate?`, timestamp: iso(now()) });
-      }
-      r.latest_parsed_result = { rate, available: true, alternative_offer: null };
-      return;
-    }
-    r.status = "confirmed";
-    r.escalation_reason = null;
-    r.hold_expires_at = iso(now() + 48 * H);
-    r.latest_parsed_result = { rate, available: true, alternative_offer: null };
+    r.latest_parsed_result = { rate, available: true, alternative_offer: firm ? "Vendor says this is their best price" : null };
+    const walk = r.need.budget_max;
+    const confirm = note => {
+      r.status = "confirmed";
+      r.escalation_reason = null;
+      r.hold_expires_at = iso(now() + 48 * H);
+      r.agreed_note = note || null;
+    };
+    if (!walk || rate <= walk) return confirm();
+    const overPct = (rate - walk) / walk * 100;
+    if (overPct <= POLICY.autoAcceptPct)
+      return confirm(`Accepted at ${money(rate)}: ${overPct.toFixed(1)}% over budget, inside the ${POLICY.autoAcceptPct}% auto-accept tolerance.`);
+
+    // A reply to our counter where the vendor said "final" or barely moved counts as a stuck round.
+    if (r.negotiation_rounds > 0 && (firm || (prevRate && rate > prevRate * 0.99))) r.stuck_rounds = (r.stuck_rounds || 0) + 1;
+    const last = lastCounter(r);
+    const qty = r.need.quantity || 1;
+    const suggestion = () => {
+      const extra = (rate - walk) * qty;
+      return `Accept at ${money(rate)} (+${money(extra)} over budget across ${qty} units), offer ${money(walk)} with a value-add ask ` +
+        `(upgrade, meals, a free place), or source another vendor.`;
+    };
+    if ((r.stuck_rounds || 0) >= POLICY.stuckLimit)
+      return escalate(r, `Vendor hasn't moved in ${r.stuck_rounds} rounds: ${money(rate)} vs budget ${money(walk)} (${overPct.toFixed(0)}% over).`, suggestion());
+    if (r.negotiation_rounds >= POLICY.maxCounters)
+      return escalate(r, `Still ${money(rate)} after ${r.negotiation_rounds} counter-offers (budget ${money(walk)}).`, suggestion());
+    const next = nextCounter(r, rate, firm);
+    if (next === null)
+      return escalate(r, `${firm ? "Vendor says " + money(rate) + " is their best price" : "Vendor is at " + money(rate)}` +
+        ` and we've already offered our walk-away ${money(last)} (budget ${money(walk)}, ${overPct.toFixed(0)}% over).`, suggestion());
+    r.negotiation_rounds += 1;
+    r.last_counter = next;
+    r.status = "negotiating";
+    const body = last == null
+      ? `Thank you for the quote. For this booking we can offer ${money(next)}. Could you meet us at that rate?`
+      : firm
+        ? `Thank you for coming back to us. We understand ${money(rate)} is your best price. The most we can stretch to is ${money(next)}${qty > 1 ? " for the full booking" : ""} — if that works, we can confirm today.`
+        : `Thank you for the revised rate. We can move to ${money(next)}. Could you meet us there so we can confirm?`;
+    r.message_history.push({ direction: "outbound", content: body, timestamp: iso(now()) });
   }
 
   function vendorsList() {
@@ -214,10 +283,10 @@
       const r = find(m[1]);
       if (!r) return json({ detail: "Request not found" }, 404);
       if (m[2] === "reply") parseReply(r, body.reply_text || "");
-      if (m[2] === "lock") { r.status = "confirmed"; r.escalation_reason = null; r.hold_expires_at = null; }
+      if (m[2] === "lock") { r.status = "confirmed"; r.escalation_reason = null; r.suggested_next_move = null; r.hold_expires_at = null; }
       if (m[2] === "revise") {
         if (body.new_quantity) r.need.quantity = body.new_quantity;
-        r.status = "sent"; r.escalation_reason = null;
+        r.status = "sent"; r.escalation_reason = null; r.suggested_next_move = null; r.stuck_rounds = 0;
         r.message_history.push({ direction: "outbound", content: `Update to our booking: ${body.change_description}. Could you re-confirm availability and rate?`, timestamp: iso(now()) });
       }
       touch(r); save();

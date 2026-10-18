@@ -105,13 +105,18 @@ def test_final_edit_switches_vendor_to_one_with_a_valid_quote(g, sim):
         graph.resume_trip(g, "t9b", {"action": "edit", "selections": {"hotel": "V999"}})
 
 
-def test_firm_high_vendor_escalates_with_reason_after_two_rounds(g, sim):
+def test_firm_high_vendor_escalates_with_reason_and_next_move(g, sim):
+    # vendor ~22% over anchor says "final"; our first counter already sits at the walk-away price,
+    # so there is no honest second offer: escalate instead of re-sending the same ask
     prof = dict(CLEAN, hotel="firm_high")
     snap = go_to(g, "escalation", approve_all, "t10", prof)
     t = snap["trip"]
     hotel = next(s for s in t["services"] if s["service_id"] == "hotel")
-    assert hotel["negotiation_round"] == 2 and len(hotel["counters"]) == 2
-    assert "above anchor after 2 rounds" in snap["gate"]["items"][0]["reason"]
+    rates = [c["counter_rate"] for c in hotel["counters"]]
+    assert 1 <= len(rates) <= 2 and rates == sorted(set(rates))           # never repeats or lowers an ask
+    item = snap["gate"]["items"][0]
+    assert "above anchor" in item["reason"] and "best price" in item["reason"]
+    assert item["suggestion"].startswith("Accept at")
     assert [c["discount_pct"] for c in hotel["counters"]][0] <= 10
 
 

@@ -304,7 +304,7 @@ def escalate(s):
         if svc.status == "escalated" and svc.escalation:
             vq = _resolved_valid_quotes(svc)
             items.append(dict(service_id=svc.service_id, category=svc.category, reason=svc.escalation.reason,
-                              code=svc.escalation.code, options=svc.escalation.options,
+                              code=svc.escalation.code, options=svc.escalation.options, suggestion=svc.escalation.suggestion,
                               valid_quotes=[dict(vendor_id=v, vendor=_vname(v), unit_rate=q.unit_rate, currency=q.currency,
                                                  floor_allows_counter=bool(svc.anchors[v].floor_rate and q.unit_rate > svc.anchors[v].floor_rate))
                                             for v, q in vq.items()],
@@ -358,8 +358,9 @@ def counter(s):
         a = svc.anchors[vid]
         operator_set = svc.operator_counter_rate is not None
         try:
-            c = svc.operator_counter_rate if operator_set else A.compute_counter(
-                q.unit_rate, a.floor_rate, t.policy.discount_for_round(svc.negotiation_round))
+            c = svc.operator_counter_rate if operator_set else A.next_counter(svc, vid, q, t.policy)
+            if c is None:
+                raise BoundViolation("no counter left above our last offer and within the walk-away price")
             A.assert_counter_bounds(c, q.unit_rate, a.floor_rate, t.policy, svc.negotiation_round)
         except BoundViolation as e:
             svc.status, svc.decision = "escalated", "escalate"

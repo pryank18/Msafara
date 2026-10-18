@@ -247,7 +247,8 @@ def get_policy() -> Policy:
     p = kb.load()["policies"]
     return Policy(**{k: p[k] for k in ("markup_pct", "max_discount_pct", "max_rounds", "discount_schedule",
                                        "over_anchor_tolerance_pct", "confidence_threshold",
-                                       "preferred_vendor_ids", "blacklist_vendor_ids")})
+                                       "preferred_vendor_ids", "blacklist_vendor_ids",
+                                       "auto_accept_tolerance_pct", "stuck_round_limit") if k in p})
 
 
 def policy_chunk(query: str, section: str) -> rag.Hit | None:
@@ -444,6 +445,7 @@ class ParsedQuote(BaseModel):
     tax_inclusive: Optional[bool] = None
     available_units: Optional[int] = None
     accepts_counter: bool = False
+    firm: bool = False
     confidence: float = 0.0
     summary: str = ""
 
@@ -455,6 +457,16 @@ _INCL = re.compile(r"inclusive|\bincl\b|taxes included|all taxes|including (?:al
 _EXCL = re.compile(r"exclusive of|excluding|excl\b|before tax", re.I)
 _AGREE = re.compile(r"\b(accept|agree|agreed|okay|ok|deal|works for us|happy to)\b", re.I)
 _REFUSE = re.compile(r"cannot|can't|unable|sorry|unfortunately|not possible|best rate|lowest|final rate|no flexibility", re.I)
+# The vendor is telling us this price will not move. Only meaningful in a reply to OUR counter:
+# "our best rate is ..." in a first quote is just sales language.
+_FIRM = re.compile(r"best (?:we|i) can (?:do|offer|go)|(?:our|my|the) (?:very )?(?:best|final|lowest|last)(?: possible)? "
+                   r"(?:price|rate|offer|figure)|(?:can'?t|cannot|can not|unable to|won'?t) (?:go|come) (?:any )?(?:lower|down|further|below)|"
+                   r"no (?:further|more) (?:discount|reduction|room|flexibility)|no flexibility|\bfinal\b|rock[- ]bottom|"
+                   r"non[- ]negotiable|take it or leave it|that'?s (?:the )?(?:best|lowest)", re.I)
+
+
+def is_firm(text: str) -> bool:
+    return bool(text and _FIRM.search(text))
 
 
 def mock_parse_quote(text: str, needed_qty: int, our_counter: Optional[float], cur: str) -> ParsedQuote:
@@ -526,9 +538,18 @@ def parse_quote(trip: TripState, svc: ServiceLine, vendor_id: str, reply: Option
         except llm.LLMOutputError as e:
             trip.log("agent:parse", "parse", "llm_failed_mark_ambiguous", vendor_id=vendor_id, error=str(e)[:200])
             pq = ParsedQuote(status="ambiguous", currency=cur, confidence=0.3, summary="Could not parse reply reliably.")
+    firm = False
+    if our_counter is not None and not pq.accepts_counter and pq.unit_rate is not None:
+        firm = pq.firm or is_firm(reply)       # the regex backs up the LLM; either is enough
+        # A revised price in the same thread keeps the tax basis of the vendor's earlier quote.
+        prev = latest_valid_quote(svc, vendor_id)
+        if pq.status == "tax_unclear" and prev is not None and prev.tax_inclusive:
+            pq = pq.model_copy(update=dict(status="quote", tax_inclusive=True,
+                                           summary=pq.summary + " Tax basis carried over from the earlier quote."))
+    summary = pq.summary + (" Vendor says this is their best price." if firm else "")
     return Quote(vendor_id=vendor_id, status=pq.status, unit_rate=pq.unit_rate, currency=pq.currency or cur,
                  tax_inclusive=pq.tax_inclusive, available_units=pq.available_units, accepts_counter=pq.accepts_counter,
-                 confidence=pq.confidence, summary=pq.summary, raw_text=reply, round=rnd)
+                 firm=firm, confidence=pq.confidence, summary=summary, raw_text=reply, round=rnd)
 
 
 # =========================================================== NEGOTIATION (pure code)
@@ -555,6 +576,67 @@ def latest_valid_quote(svc: ServiceLine, vendor_id: str) -> Optional[Quote]:
         if q.vendor_id == vendor_id and q.status == "quote" and q.unit_rate:
             return q
     return None
+
+
+def walk_away(a: Anchor, policy: Policy) -> Optional[float]:
+    """The most we will agree to without a human: anchor x (1 + over-anchor tolerance)."""
+    if not a.anchor_rate:
+        return None
+    return float(ceil_money(a.anchor_rate * (1 + policy.over_anchor_tolerance_pct / 100.0)))
+
+
+def last_counter(svc: ServiceLine, vendor_id: str) -> Optional[CounterRecord]:
+    return next((c for c in reversed(svc.counters) if c.vendor_id == vendor_id), None)
+
+
+def stuck_rounds(svc: ServiceLine, vendor_id: str) -> int:
+    """Replies to our counters where the vendor said 'final' or moved less than 1% from their previous price."""
+    qs = [q for q in svc.quote_history if q.vendor_id == vendor_id and q.status == "quote" and q.unit_rate]
+    n = 0
+    for prev, cur in zip(qs, qs[1:]):
+        if cur.accepts_counter or cur.round < 1:
+            continue
+        if cur.firm or cur.unit_rate > prev.unit_rate * 0.99:
+            n += 1
+    return n
+
+
+def next_counter(svc: ServiceLine, vendor_id: str, q: Quote, policy: Policy) -> Optional[int]:
+    """Our next offer to this vendor, or None if there is no honest move left.
+
+    The first counter uses the discount schedule. After that we never repeat or lower our own ask: we step up
+    from our last offer halfway towards the walk-away price (all the way to it if the vendor says the price is final),
+    still inside the 10%-off / floor guardrails.
+    """
+    a = svc.anchors[vendor_id]
+    scheduled = compute_counter(q.unit_rate, a.floor_rate, policy.discount_for_round(svc.negotiation_round))
+    prev = last_counter(svc, vendor_id)
+    if prev is None:
+        return scheduled
+    walk = walk_away(a, policy)
+    if walk is None or (q.firm and q.unit_rate <= walk):
+        return None                          # a final price we can live with: accept, don't haggle over crumbs
+    ceiling = min(walk, q.unit_rate - 1)
+    target = ceiling if q.firm else ceil_money((prev.counter_rate + ceiling) / 2)
+    cap = min(policy.max_discount_pct, HARD_MAX_DISCOUNT_PCT)
+    c = ceil_money(max(target, a.floor_rate or 0, q.unit_rate * (1 - cap / 100.0)))
+    if c <= prev.counter_rate or c >= q.unit_rate * 0.99 or c > walk:
+        return None                          # nothing left but a token step: hand it back instead
+    return c
+
+
+def _next_move(svc: ServiceLine, vendor_id: str, q: Quote, policy: Policy) -> str:
+    a, cur = svc.anchors[vendor_id], q.currency
+    walk, prev = walk_away(a, policy), last_counter(svc, vendor_id)
+    extra = (q.unit_rate - (prev.counter_rate if prev else a.anchor_rate or q.unit_rate)) * svc.units
+    parts = [f"Accept at {fmt_money(q.unit_rate, cur)} (about {fmt_money(max(extra, 0), cur)} more on this service"
+             f"{' than our last offer' if prev else ''})"]
+    if walk and (prev is None or walk > prev.counter_rate) and walk < q.unit_rate:
+        parts.append(f"make a final offer at {fmt_money(walk, cur)} and ask for a value-add (upgrade, meals, free extra unit)")
+    else:
+        parts.append("ask for a value-add at this price instead of a lower rate")
+    parts.append("or source an alternative vendor")
+    return "; ".join(parts) + "."
 
 
 def validate_operator_counter(svc: ServiceLine, vendor_id: str, rate: float, policy: Policy):
@@ -642,32 +724,51 @@ def decide_service(svc: ServiceLine, policy: Policy):
         svc.confidence = round(q.confidence * 0.95, 2)
         return
     over = (q.unit_rate - a.anchor_rate) / a.anchor_rate * 100
-    if svc.negotiation_round < policy.rounds_cap:
-        d = policy.discount_for_round(svc.negotiation_round)
-        counter = compute_counter(q.unit_rate, a.floor_rate, d)
-        if counter >= q.unit_rate:
+    if over <= policy.auto_accept_tolerance_pct:
+        svc.decision, svc.status, svc.agreed_rate = "accept", "accepted", q.unit_rate
+        svc.reasoning = (f"{base}, {over:.1f}% above anchor {fmt_money(a.anchor_rate, cur)} "
+                         f"(within the {policy.auto_accept_tolerance_pct:g}% auto-accept tolerance): accept.")
+        svc.confidence = round(q.confidence * 0.9, 2)
+        return
+    prev = last_counter(svc, vid)
+    stuck = stuck_rounds(svc, vid)
+    firm_note = " Vendor says this is their best price." if q.firm else ""
+    if svc.negotiation_round < policy.rounds_cap and stuck < policy.stuck_round_limit:
+        counter = next_counter(svc, vid, q, policy)
+        if counter is not None and counter >= q.unit_rate:
             svc.decision, svc.status, svc.agreed_rate = "accept", "accepted", q.unit_rate
             svc.reasoning = f"{base}; already at/near our floor, nothing to negotiate: accept."
             svc.confidence = round(q.confidence * 0.85, 2)
             return
-        svc.decision, svc.status = "counter", "negotiating"
-        hist = f" {a.history_note}" if a.history_note else ""
-        svc.reasoning = (f"{base}, {over:.0f}% above anchor {fmt_money(a.anchor_rate, cur)}; "
-                         f"counter round {svc.negotiation_round + 1} at {fmt_money(counter, cur)} "
-                         f"(max {d:.0f}% off, floor respected).{hist}")
-        svc.confidence = round(q.confidence * 0.85, 2)
-        return
+        if counter is not None:
+            svc.decision, svc.status = "counter", "negotiating"
+            hist = f" {a.history_note}" if a.history_note else ""
+            if prev is None:
+                d = policy.discount_for_round(svc.negotiation_round)
+                how = f"(max {d:.0f}% off, floor respected)"
+            else:
+                how = (f"(up from our last offer {fmt_money(prev.counter_rate, cur)}, towards walk-away "
+                       f"{fmt_money(walk_away(a, policy), cur)}; floor respected)")
+            svc.reasoning = (f"{base}, {over:.0f}% above anchor {fmt_money(a.anchor_rate, cur)}; "
+                             f"counter round {svc.negotiation_round + 1} at {fmt_money(counter, cur)} {how}.{firm_note}{hist}")
+            svc.confidence = round(q.confidence * 0.85, 2)
+            return
+    # No honest move left: rounds used up, vendor stuck, or we are already at our walk-away price.
+    why = (f"after {svc.negotiation_round} round(s)" if stuck < policy.stuck_round_limit
+           else f"vendor has not moved in {stuck} rounds")
     if over <= policy.over_anchor_tolerance_pct:
         svc.decision, svc.status, svc.agreed_rate = "accept", "accepted", q.unit_rate
-        svc.reasoning = (f"{base}; vendor held firm after {svc.negotiation_round} rounds, {over:.0f}% above anchor "
-                         f"(within {policy.over_anchor_tolerance_pct:.0f}% tolerance): accept.")
+        svc.reasoning = (f"{base}; vendor held firm {why}, {over:.0f}% above anchor "
+                         f"(within {policy.over_anchor_tolerance_pct:.0f}% tolerance): accept.{firm_note}")
         svc.confidence = round(q.confidence * 0.75, 2)
         return
     svc.decision, svc.status = "escalate", "escalated"
+    last = f"; our last offer {fmt_money(prev.counter_rate, cur)}" if prev else ""
     svc.escalation = Escalation(
-        reason=(f"quote {over:.0f}% above anchor after {svc.negotiation_round} rounds: {fmt_money(q.unit_rate, cur)} vs "
-                f"{fmt_money(a.anchor_rate, cur)} ({over_card:+.0f}% vs rate card {fmt_money(a.rate_card_rate, cur)})"),
-        code="over_anchor", options=["accept_quote", "drop_service"])
+        reason=(f"quote {over:.0f}% above anchor {why}: {fmt_money(q.unit_rate, cur)} vs "
+                f"{fmt_money(a.anchor_rate, cur)} ({over_card:+.0f}% vs rate card {fmt_money(a.rate_card_rate, cur)}){last}"
+                f"{'; vendor says this is their best price' if q.firm else ''}"),
+        code="over_anchor", options=["accept_quote", "drop_service"], suggestion=_next_move(svc, vid, q, policy))
     svc.reasoning, svc.confidence = "Escalated: " + svc.escalation.reason, round(q.confidence * 0.6, 2)
 
 

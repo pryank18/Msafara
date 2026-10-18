@@ -31,7 +31,9 @@ class Policy(BaseModel):
     max_discount_pct: float = 10
     max_rounds: int = 2
     discount_schedule: list[float] = [10, 5]
-    over_anchor_tolerance_pct: float = 10
+    over_anchor_tolerance_pct: float = 10   # walk-away = anchor x (1 + this); never pay more without a human
+    auto_accept_tolerance_pct: float = 3    # quotes this close to the anchor are accepted without countering
+    stuck_round_limit: int = 2              # vendor firm / not moving this many times -> escalate
     confidence_threshold: float = 0.6
     preferred_vendor_ids: list[str] = []
     blacklist_vendor_ids: list[str] = []
@@ -74,6 +76,7 @@ class Quote(BaseModel):
     tax_inclusive: Optional[bool] = None
     available_units: Optional[int] = None
     accepts_counter: bool = False
+    firm: bool = False                       # vendor says this is their best / final price
     confidence: float = 0.0
     summary: str = ""
     raw_text: str = ""
@@ -110,6 +113,7 @@ class Escalation(BaseModel):
     reason: str
     code: str
     options: list[str] = Field(default_factory=list)
+    suggestion: str = ""                     # suggested next move for the operator
 
 
 class ServiceLine(BaseModel):
