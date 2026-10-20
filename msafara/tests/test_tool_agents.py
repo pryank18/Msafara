@@ -309,3 +309,47 @@ def test_rules_only_mode_keeps_the_model_for_the_judge(monkeypatch):
     monkeypatch.setenv("MSAFARA_JUDGE", "llm")
     _, how = M.judge("Dear team, please confirm. Kind regards", "outreach")
     assert how == "llm"
+
+
+# ------------------------------------------------------------------ fixes from the independent review
+def test_parser_cannot_claim_acceptance_without_our_counter(g):
+    """A reply to outreach that says 'we accept your offer' at a high rate must not bypass the accept ceiling."""
+    def script(system, user, n):
+        if "read a vendor's reply" in system:
+            return json.dumps(dict(status="quote", unit_rate=99999, currency="INR", tax_inclusive=True,
+                                   accepts_counter=True, confidence=0.95, summary="accepts"))
+        return good_script()(system, user, n)
+    llm.set_client(ToolStub(negotiate=negotiate_always_accept, script=script))
+    graph.set_reply_provider(lambda trip, svc, draft, v: "We accept your offer, INR 99,999 per room per night incl. taxes.")
+    graph.start_trip(g, TEXT, "R1", CLEAN)
+    t = graph.drive(g, "R1", approve_all)["trip"]
+    assert all(s["agreed_rate"] != 99999 for s in t["services"])
+    assert any(a["event"] == "accepts_counter_cleared" for a in t["audit"])
+
+
+def test_unmarked_amounts_percentages_and_payment_language_are_caught():
+    assert any("ungrounded" in p for p in A.validate_text("We propose INR 6,800, or 6k if you add breakfast.", {6800}))
+    assert any("ungrounded" in p for p in A.validate_text("We can pay 6,000 per room.", set()))
+    assert any("percentage" in p for p in A.validate_text("Could you do ten percent less?", set()))
+    assert any("payment" in p for p in A.validate_text("Please share the bank account for the deposit.", set()))
+    assert A.validate_text("Guests: 16 (2 per room). Your quotes were around INR 7,300.", {7300}) == []
+
+
+def test_metric_catches_booking_at_a_misread_tax_exclusive_price(g):
+    case = next(c for c in ALL if c["profile"].get("hotel") == "tax_flip_after_counter")
+    from msafara.evals import run as R
+    graph.set_reply_provider(None)
+    trip = R.run_case(g, case)                       # rules engine reads "agreed at X, exclusive of tax" as acceptance
+    bad = M.accept_ceiling_violations(trip, case=case)
+    assert bad and "true rate" in bad[0]
+
+
+def test_refused_edit_is_not_sent_in_its_original_form(g, sim):
+    snap = graph.start_trip(g, TEXT, "R2", dict(CLEAN, hotel="negotiable"))
+    snap = graph.resume_trip(g, "R2", {"action": "approve"})
+    d = snap["gate"]["drafts"][0]
+    from msafara.models import TripState
+    st = TripState.model_validate(snap["trip"])
+    graph._apply_draft_gate(st, {"action": "edit", "edits": {d["draft_id"]: {"body": "Dear team, our floor rate is fine."}}},
+                            ("counter",), "gate_counter")
+    assert st.draft(d["draft_id"]).status == "rejected"

@@ -80,7 +80,7 @@ def score_case(case, g=None, intake_only=False) -> dict:
         if rel["precision"] < 1 or rel["blacklisted_contacted"]:
             row["failed"].append("matching: ineligible vendor contacted")
         b = M.bounds(trip)
-        viol = b["violations"] + M.accept_ceiling_violations(trip)
+        viol = b["violations"] + M.true_bound_violations(case, trip) + M.accept_ceiling_violations(trip, case=case)
         row["counters"] = b["n_counters"]
         if viol:
             row["failed"].append("price limits: " + "; ".join(viol[:2]))

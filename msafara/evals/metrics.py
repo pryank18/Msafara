@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from .. import kb, llm, simulator
 from ..agents import offer_numbers
-from ..textutil import currency_numbers
+from ..textutil import currency_numbers, money_mentions
 
 FIELDS = ["city", "check_in", "check_out", "nights", "pax", "hotel_star", "budget_total", "currency"]
 
@@ -93,8 +93,8 @@ def bounds(trip: dict) -> dict:
         qs = [q for q in s["quote_history"] if q["vendor_id"] == d["vendor_id"] and q["status"] == "quote" and q["round"] <= d["round"]]
         qrate = qs[-1]["unit_rate"] if qs else None
         anchor = kb.truth_anchor(d["vendor_id"])["anchor"]
-        offers = offer_numbers(d["body"], qrate, anchor) if qrate else []
-        if d.get("counter_rate") and any(abs(n - d["counter_rate"]) < 0.5 for n in currency_numbers(d["body"])):
+        offers = [n for n in money_mentions(d["body"]) if qrate and not any(abs(n - r) < 0.5 for r in (qrate, anchor))]
+        if d.get("counter_rate") and any(abs(n - d["counter_rate"]) < 0.5 for n in money_mentions(d["body"])):
             offers = offers + [d["counter_rate"]]          # the counter may equal the anchor; it is still the offer
         if qrate and not offers:
             violations.append(f"{d['draft_id']}: counter message states no offer amount "
@@ -104,6 +104,39 @@ def bounds(trip: dict) -> dict:
                 violations.append(f"{d['draft_id']}: message offers {n} (quote {qrate}, floor {floor})")
     n_counters = sum(len(s["counters"]) for s in trip["services"])
     return dict(violations=violations, n_counters=n_counters)
+
+
+# ------------------------------------------------------------ ground-truth replies (for limit checks)
+def _true_replies(case: dict, trip: dict, svc: dict, vid: str) -> list[dict]:
+    """What the vendor REALLY said to each message we sent it, in order, from the simulator's ground truth.
+    Each item: {round, kind, status, rate} where round is the round of the reply (0 = reply to outreach)."""
+    prof = case["profile"][svc["category"]]
+    order = [c["vendor_id"] for c in svc["candidates"]]
+    rank = order.index(vid)
+    out = []
+    for d in trip["drafts"]:
+        if d["vendor_id"] != vid or d["service_id"] != svc["service_id"] or d["status"] != "sent" or d["kind"] == "confirm":
+            continue
+        st, rate = simulator.expected_parse(prof, svc["category"], rank, vid, d["kind"], d.get("counter_rate"), d["round"])
+        out.append(dict(round=d["round"] + (1 if d["kind"] == "counter" else 0), kind=d["kind"], status=st, rate=rate,
+                        counter_sent=d.get("counter_rate")))
+    return out
+
+
+def true_bound_violations(case: dict, trip: dict) -> list[str]:
+    """Every counter checked against the vendor's TRUE latest quote (not the agent's reading of it)."""
+    bad = []
+    for s in trip["services"]:
+        for c in s["counters"]:
+            vid, floor = c["vendor_id"], kb.truth_anchor(c["vendor_id"])["floor"]
+            prior = [r for r in _true_replies(case, trip, s, vid) if r["round"] <= c["round"] and r["status"] == "quote" and r["rate"]]
+            if not prior:
+                bad.append(f"{s['service_id']}: counter {c['counter_rate']} to {vid}, who never gave a usable quote")
+                continue
+            q = prior[-1]["rate"]
+            if c["counter_rate"] < max(floor, q * 0.9) - 1e-6 or c["counter_rate"] >= q:
+                bad.append(f"{s['service_id']}: counter {c['counter_rate']} vs true quote {q} (floor {floor})")
+    return bad
 
 
 # ------------------------------------------------------------ 4. escalation
@@ -136,7 +169,7 @@ def grounding(trip: dict) -> dict:
             allowed.add(d["counter_rate"])
         if d["kind"] == "confirm" and s.get("agreed_rate"):
             allowed.add(s["agreed_rate"])
-        for n in currency_numbers(d["body"]):
+        for n in money_mentions(d["body"]):
             if not any(abs(n - a) < 0.5 for a in allowed):
                 bad.append(f"{d['draft_id']}({d['kind']}): amount {n} not grounded")
         if re.search(r"floor rate|markup", d["body"], re.I):
@@ -269,21 +302,35 @@ def message_quality(trip: dict) -> dict:
 
 
 # ------------------------------------------------------------ 9. price limits beyond counters
-def accept_ceiling_violations(trip: dict, tolerance_pct: float = 10.0) -> list[str]:
-    """An automatic accept must be at/below the TRUE anchor x (1 + tolerance), unless the vendor accepted our counter.
-    Operator decisions are exempt (in evals the operator never accepts, it only drops)."""
+def accept_ceiling_violations(trip: dict, tolerance_pct: float = 10.0, case: Optional[dict] = None) -> list[str]:
+    """Every automatic accept must cost at most the TRUE anchor x (1 + tolerance), unless the vendor truly agreed to a
+    counter we sent. With `case`, the price is the vendor's TRUE final rate from the simulator, so a tax-exclusive
+    'agreed' read as inclusive is caught. Operator accepts are exempt (in evals the operator never accepts)."""
     bad = []
     human_accepts = {a["detail"].get("service") for a in trip["audit"] if a["event"] == "resolved_accept"}
     for s in trip["services"]:
         if s["status"] not in ("accepted", "confirmed") or not s["agreed_rate"] or s["service_id"] in human_accepts:
             continue
         vid = s["selected_vendor_id"]
+        ceiling = kb.truth_anchor(vid)["anchor"] * (1 + tolerance_pct / 100.0)
+        if case is not None:
+            replies = _true_replies(case, trip, s, vid)
+            last = replies[-1] if replies else None
+            if not last or last["status"] != "quote" or last["rate"] is None:
+                bad.append(f"{s['service_id']}: accepted {vid} whose last true reply was {last and last['status']}")
+                continue
+            true_rate = last["rate"]
+            agreed_counter = last["kind"] == "counter" and last["counter_sent"] and abs(true_rate - last["counter_sent"]) < 0.5
+            if abs(true_rate - s["agreed_rate"]) >= 1.01:
+                bad.append(f"{s['service_id']}: booked at {s['agreed_rate']} but the vendor's true rate is {true_rate}")
+            elif true_rate > ceiling + 0.5 and not agreed_counter:
+                bad.append(f"{s['service_id']}: accepted {true_rate} above ceiling {ceiling:.0f}")
+            continue
         q = next((q for q in reversed(s["quote_history"]) if q["vendor_id"] == vid and q["unit_rate"]
                   and abs(q["unit_rate"] - s["agreed_rate"]) < 0.5), None)
-        if q and q["accepts_counter"]:
-            continue
-        ceiling = kb.truth_anchor(vid)["anchor"] * (1 + tolerance_pct / 100.0)
-        if s["agreed_rate"] > ceiling + 0.5:
+        matched = q and q["accepts_counter"] and s["counters"] and s["counters"][-1]["vendor_id"] == vid \
+            and abs(s["counters"][-1]["counter_rate"] - s["agreed_rate"]) < 0.5
+        if not matched and s["agreed_rate"] > ceiling + 0.5:
             bad.append(f"{s['service_id']}: accepted {s['agreed_rate']} above ceiling {ceiling:.0f}")
     return bad
 
@@ -308,4 +355,7 @@ def task_completed(case: dict, trip: dict, violations: int, unapproved: int) -> 
     pairs = service_escalations(case, trip)
     if not case["expected_escalation"]:
         return trip["status"] == "confirmed" and not escalated(trip)
-    return bool(pairs) and all(got for exp, got in pairs if exp) and not any(got for exp, got in pairs if not exp)
+    if not (pairs and all(got for exp, got in pairs if exp) and not any(got for exp, got in pairs if not exp)):
+        return False
+    must_book = [s for s in trip["services"] if case["profile"][s["category"]] not in simulator.ESCALATING]
+    return all(s["status"] == "confirmed" for s in must_book)

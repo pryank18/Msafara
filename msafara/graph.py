@@ -179,6 +179,7 @@ def _apply_draft_gate(t: TripState, d: dict, kinds: tuple, node: str):
             probs = A.validate_edit(x, t.svc(x.service_id), t.policy, body)
             if probs:
                 t.log("human", node, "edit_refused", draft_id=did, problems=probs)
+                rejected_ids.add(did)          # never fall back to sending the unedited text
                 continue
             x.body, x.subject, x.edited = body, subj, True
             t.log("human", node, "draft_edited", draft_id=did, vendor_id=x.vendor_id)
@@ -372,6 +373,7 @@ def counter(s):
                                         options=["accept_quote", "drop_service"])
             svc.reasoning = svc.escalation.reason
             t.log("agent:negotiation", "counter", "guardrail_blocked", service=svc.service_id, error=str(e))
+            t.log("agent:escalation", "counter", "escalated_to_human", service=svc.service_id, reason=svc.escalation.reason)
             continue
         body = svc.llm_counter_body if agent_set else ""
         svc.operator_counter_rate, svc.llm_counter_rate, svc.llm_counter_body = None, None, ""

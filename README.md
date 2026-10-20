@@ -5,7 +5,7 @@
 ![python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![langgraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C)
 ![rag](https://img.shields.io/badge/RAG-Chroma%20%C2%B7%20442%20chunks-F5A524)
-![tests](https://img.shields.io/badge/tests-96%20passing-2EA043)
+![tests](https://img.shields.io/badge/tests-102%20passing-2EA043)
 ![bound violations](https://img.shields.io/badge/bound%20violations-0-2EA043)
 ![agents](https://img.shields.io/badge/agents-tool%20calling-6E56CF)
 ![llm](https://img.shields.io/badge/runs%20with-no%20API%20key-555)
@@ -96,7 +96,7 @@ Runs are appended to `msafara/evals/runs.jsonl` with a generic model class; the 
 
 ```bash
 pip install -r requirements-msafara.txt
-python -m pytest -q                                   # 96 tests, no API key needed
+python -m pytest -q                                   # 102 tests, no API key needed
 python -m msafara.evals.run --workers 8 --label "my run"   # 100 trips + held-out intake
 python -m msafara.evals.run --report
 python -m msafara.evals.results                       # rebuild the results table from the log
@@ -114,7 +114,7 @@ python -m msafara.evals.results                       # rebuild the results tabl
 | `msafara/evals/` | 100 cases, metrics, parallel runner, run history, results page |
 | `msafara/prompts/` | versioned prompts and changelog |
 | `msafara/simulator.py` | deterministic vendor simulator |
-| `msafara/tests/` | 96 tests |
+| `msafara/tests/` | 102 tests |
 | `msafara/api.py` | FastAPI router that serves the Trip Desk |
 | `index.html`, `demo-api.js` | in-browser demo on GitHub Pages |
 | `graph.py`, `storage.py`, `dispatch.py`, `inbox_poll.py` | the earlier request-tracking workflow |
@@ -170,4 +170,5 @@ Built by Pryank Wadhera. Product scope, requirements (see `docs/`) and QA are mi
 - Vendor replies are simulated in the evals. No real vendor has been contacted.
 - WhatsApp replies need a webhook receiver (not included); outbound only for now.
 - One eval run per system; small run-to-run differences on the model side are expected.
+- The approval gate and the limits cover the `msafara/` trip workflow. The older request-tracking flow at the repo root (`graph.py`, `dispatch.py`) sends without that gate.
 - Intake grounding proves a value appears in the request, not that it was read correctly.

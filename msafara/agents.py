@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from . import kb, llm, rag
 from .models import (HARD_MAX_DISCOUNT_PCT, Anchor, Candidate, CounterRecord, Escalation, OutreachDraft,
                      Policy, Quote, ServiceLine, TripBrief, TripState)
-from .textutil import ceil_money, currency_numbers, fmt_money, med, to_float
+from .textutil import ceil_money, currency_numbers, fmt_money, med, money_mentions, percentages, to_float
 
 REQUIRED_FIELDS = ["city", "check_in", "check_out", "pax", "hotel_star"]
 
@@ -381,15 +381,26 @@ _PLACEHOLDER = re.compile(r"\[(?:your |vendor |company |sender )?(?:name|company
 _FORBIDDEN_WORDS = re.compile(r"\b(floor rate|markup|mark-up|walk-away|our budget)\b", re.I)
 
 
-def validate_text(body: str, allowed: set[float], floor: Optional[float] = None) -> list[str]:
-    """Return a list of problems (empty = safe to send). Used on LLM output."""
+_COMMIT = re.compile(r"\b(?:deposit|advance payment|wire|bank (?:account|transfer)|we (?:hereby )?confirm (?:the|this|our) booking|"
+                     r"booking is confirmed|we accept your (?:rate|quote|offer)|payment (?:will be|has been) (?:made|sent))\b", re.I)
+
+
+def validate_text(body: str, allowed: set[float], floor: Optional[float] = None, allowed_text: str = "") -> list[str]:
+    """Return a list of problems (empty = safe to send). Used on every model-written outbound message.
+    Amounts are read with or without a currency marker ('INR 6,000', '6k', '6,000 per room')."""
     problems = []
-    for n in currency_numbers(body):
+    amounts = money_mentions(body)
+    for n in amounts:
         if not any(abs(n - a) < 0.5 for a in allowed):
             problems.append(f"ungrounded amount {n:,.0f}")
-    if floor is not None and any(abs(n - floor) < 0.5 for n in currency_numbers(body)) and \
+    if floor is not None and any(abs(n - floor) < 0.5 for n in amounts) and \
             not any(abs(floor - a) < 0.5 for a in allowed):
         problems.append("floor rate disclosed")
+    stray = [p for p in percentages(body) if p not in allowed_text]
+    if stray:
+        problems.append(f"percentage not on file: {stray[0]}")
+    if _COMMIT.search(body):
+        problems.append("commitment or payment language")
     if _FORBIDDEN_WORDS.search(body):
         problems.append("mentions internal terms")
     if _PLACEHOLDER.search(body):
@@ -470,7 +481,7 @@ def draft_outreach(trip: TripState, svc: ServiceLine, cand: Candidate) -> Outrea
                          unit=_unit_phrase(svc), vendor_past_quote_anchor=a.anchor_rate, currency=a.currency,
                          cancellation_terms=canc)
             cand_msg = llm.structured_call("outreach", __import__("json").dumps(facts), _Msg)
-            problems = validate_text(cand_msg.body, {a.anchor_rate} if a.anchor_rate else set(), a.floor_rate)
+            problems = validate_text(cand_msg.body, {a.anchor_rate} if a.anchor_rate else set(), a.floor_rate, allowed_text=canc)
             if problems:
                 trip.log("agent:outreach", "outreach", "llm_text_rejected_used_template", vendor_id=cand.vendor_id, problems=problems)
                 by = "template(fallback)"
@@ -499,7 +510,7 @@ def draft_counter(trip: TripState, svc: ServiceLine, vendor_id: str, vname: str,
     if agent_body.strip():
         allowed = {counter, quote.unit_rate} | ({a.anchor_rate} if a.anchor_rate else set())
         problems = validate_text(agent_body, allowed, a.floor_rate)
-        if not any(abs(n - counter) < 0.5 for n in currency_numbers(agent_body)):
+        if not any(abs(n - counter) < 0.5 for n in money_mentions(agent_body)):
             problems.append("counter amount missing from text")
         if problems:
             trip.log("guardrail", "counter", "agent_text_rejected_used_template", vendor_id=vendor_id, problems=problems)
@@ -634,6 +645,9 @@ def parse_quote(trip: TripState, svc: ServiceLine, vendor_id: str, reply: Option
         except llm.LLMOutputError as e:
             trip.log("agent:parse", "parse", "llm_failed_mark_ambiguous", vendor_id=vendor_id, error=str(e)[:200])
             pq = ParsedQuote(status="ambiguous", currency=cur, confidence=0.3, summary="Could not parse reply reliably.")
+    if pq.accepts_counter and not (our_counter is not None and pq.unit_rate is not None and abs(pq.unit_rate - our_counter) < 0.5):
+        trip.log("guardrail", "parse", "accepts_counter_cleared", vendor_id=vendor_id, rate=pq.unit_rate, our_counter=our_counter)
+        pq.accepts_counter = False
     flags = reply_flags(reply)
     if flags:
         trip.log("guardrail", "parse", "suspicious_instructions_in_reply", vendor_id=vendor_id)
@@ -658,6 +672,12 @@ def assert_counter_bounds(counter: float, quote: float, floor: float, policy: Po
         raise BoundViolation(f"counter {counter} more than {cap}% below quote {quote}")
     if counter >= quote:
         raise BoundViolation(f"counter {counter} is not below quote {quote}")
+
+
+def counter_matches(svc: ServiceLine, vendor_id: str, rate: Optional[float]) -> bool:
+    """True only if our most recent counter went to this vendor at exactly this rate."""
+    c = svc.counters[-1] if svc.counters else None
+    return bool(c and rate is not None and c.vendor_id == vendor_id and abs(c.counter_rate - rate) < 0.5)
 
 
 def latest_valid_quote(svc: ServiceLine, vendor_id: str) -> Optional[Quote]:
@@ -704,7 +724,7 @@ def decide_service(svc: ServiceLine, policy: Policy):
     svc.escalation, svc.decision = None, None
     thr = policy.confidence_threshold
     last_neg = svc.counters[-1].vendor_id if svc.counters else None
-    sus = [v for v, q in svc.quotes.items() if "suspicious_instructions" in q.flags]
+    sus = sorted({q.vendor_id for q in svc.quote_history if "suspicious_instructions" in q.flags})
     if sus:
         svc.decision, svc.status = "escalate", "escalated"
         svc.escalation = Escalation(reason=f"reply from {', '.join(_cname(svc, v) for v in sus)} contains instructions aimed at "
@@ -753,7 +773,7 @@ def decide_service(svc: ServiceLine, policy: Policy):
         svc.reasoning, svc.confidence = svc.escalation.reason, q.confidence
         return
     over_card = ((q.unit_rate - a.rate_card_rate) / a.rate_card_rate * 100) if a.rate_card_rate else 0
-    if q.accepts_counter:
+    if q.accepts_counter and counter_matches(svc, vid, q.unit_rate):
         svc.decision, svc.status, svc.agreed_rate = "accept", "accepted", q.unit_rate
         svc.reasoning = f"{nm} agreed to our counter of {fmt_money(q.unit_rate, cur)} (floor on file respected)."
         svc.confidence = round(q.confidence * 0.95, 2)

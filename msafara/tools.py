@@ -193,9 +193,11 @@ class NegotiationCtx:
                 return dict(ok=False, error=f"latest reply from this vendor is '{cur.status}', not a usable quote"), False
             if q.confidence < self.pol.confidence_threshold:
                 return dict(ok=False, error="parse confidence below threshold; escalate"), False
+            if q.available_units is not None and q.available_units < self.svc.min_capacity:
+                return dict(ok=False, error="vendor cannot cover the full quantity; escalate"), False
             lim = self._limits(vid)
             ceiling = lim.get("auto_accept_ceiling")
-            if not q.accepts_counter:
+            if not (q.accepts_counter and A.counter_matches(self.svc, vid, q.unit_rate)):
                 if ceiling is None:
                     return dict(ok=False, error="no past-quote anchor on file; escalate"), False
                 if q.unit_rate > ceiling + 1e-6:
@@ -204,6 +206,8 @@ class NegotiationCtx:
             self.decision = dict(action="accept", vendor_id=vid, rate=q.unit_rate, reason=str(args.get("reason") or "")[:300])
             return dict(ok=True, accepted=vid, rate=q.unit_rate), True
         if name == "propose_counter":
+            if cur and cur.status != "quote":
+                return dict(ok=False, error=f"latest reply from this vendor is '{cur.status}'; escalate"), False
             lim = self._limits(vid)
             if not lim["ok"]:
                 return lim, False
