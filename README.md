@@ -5,13 +5,14 @@
 ![python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![langgraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C)
 ![rag](https://img.shields.io/badge/RAG-Chroma%20%C2%B7%20442%20chunks-F5A524)
-![tests](https://img.shields.io/badge/tests-74%20passing-2EA043)
+![tests](https://img.shields.io/badge/tests-96%20passing-2EA043)
 ![bound violations](https://img.shields.io/badge/bound%20violations-0-2EA043)
+![agents](https://img.shields.io/badge/agents-tool%20calling-6E56CF)
 ![llm](https://img.shields.io/badge/runs%20with-no%20API%20key-555)
 
 > 📘 **[Product case study on Notion](https://fern-appliance-85f.notion.site/3ebefd17b766814b8760e8717345b4a7)** · **[Live demo](https://pryank18.github.io/Msafara/)** · **Docs:** [PRD](docs/PRD.md) · [BRD](docs/BRD.md) · [MRD](docs/MRD.md) · [Spec](docs/product-spec.md) · **More work:** [Notion portfolio](https://fern-appliance-85f.notion.site/Pryank-Wadhera-3eaefd17b76680c88283e85a3217ff52)
 
-A trip request arrives as free text. Msafara pulls out the brief, shortlists three to five vendors per service (hotel, transport, activity) from a knowledge base, drafts the outreach, parses the replies, counters inside hard limits, and escalates anything it should not decide. Every outbound message waits at a gate where the operator can approve, edit or reject it.
+A trip request arrives as free text. LLM agents read it into a brief, search the vendor knowledge base and shortlist three to five vendors per service (hotel, transport, activity), draft the outreach, read the replies, and decide whether to accept, counter or escalate, choosing the counter amount themselves. They act by calling tools, and every tool checks its own limits in code. A rules engine runs alongside as the guardrail and takes over if the model fails. Every outbound message waits at a gate where the operator can approve, edit or reject it.
 
 ## See it
 
@@ -25,14 +26,14 @@ Each service shows its stage, a one-line reason for the decision and a confidenc
 
 ```mermaid
 flowchart LR
-    A[Intake<br/>free text to brief] --> B[Match<br/>RAG filter + rank, 3-5 per service]
+    A[Intake agent<br/>free text to brief, grounded] --> B[Sourcing agent<br/>search_vendors tool, 3-5 per service]
     B --> C[Outreach drafts]
     C --> G1{{Human gate<br/>approve / edit / reject}}
     G1 --> D[Send]
-    D --> E[Collect replies<br/>parse + ground the rate]
-    E --> F{Decide}
-    F -->|at or under anchor| H[Accept]
-    F -->|over anchor, rounds left| I[Counter<br/>within bounds]
+    D --> E[Read replies<br/>LLM parse + ground the rate]
+    E --> F{Negotiation agent<br/>tools + rules guardrail}
+    F -->|accept_quote| H[Accept]
+    F -->|propose_counter<br/>amount inside limits| I[Counter draft]
     I --> G1
     F -->|ambiguous, partial, silent, declined| X[Escalate to human]
     H --> G2{{Final approval}}
@@ -41,6 +42,18 @@ flowchart LR
 ```
 
 One shared trip state flows through a single router node, so every decision is visible in one place. Human gates use LangGraph interrupts, and the graph resumes from the saved checkpoint.
+
+## Agents and tools
+
+| Agent | What the model decides | Tools it calls | What code still enforces |
+|---|---|---|---|
+| Intake | every field of the brief from messy free text | (structured output) | each value must appear in the request text, or it is cleared and the trip escalates |
+| Sourcing | which 3-5 vendors to ask | `search_vendors`, `select_vendors` | city, category, star, capacity and blacklist are applied inside the search; only returned vendors can be selected |
+| Reply reading | status, tax-inclusive rate, availability, whether our counter was accepted | (structured output, with the thread so far) | the rate must be traceable to the reply text; instructions inside a reply are flagged |
+| Negotiation | accept, counter (and the amount and wording), or escalate | `check_vendor_status`, `get_price_history`, `get_price_limits`, `propose_counter`, `accept_quote`, `escalate_to_human` | counters outside the allowed range are refused; accepts above the ceiling are refused; replies the policy sends to a human allow only `escalate_to_human` |
+| Outreach | wording of each request | (structured output) | any price not on file, the floor or internal terms swaps the text for a template |
+
+Tool calling is native on all three backends (a messages-style API, a local model server, a hosted generateContent-style API) behind one loop in `msafara/llm.py`. A refused tool call goes back to the model as an error it can correct. If no decision arrives within the step limit, the rules engine decides instead, and the trip records it. No tool can send anything: a counter is a draft until a person approves it.
 
 ## What it will not do
 
@@ -64,24 +77,11 @@ The embedder is a lexical hashing embedder, so the demo needs no model download.
 
 ## Evals
 
-Twenty-five synthetic trips run against a deterministic vendor simulator with eleven reply behaviours (clean, negotiable, firm, ambiguous, partial, silent, declining and others), plus twelve held-out intake phrasings the parser was not tuned on.
-
-| Metric | Result |
-|---|---|
-| Bound violations (independent check against knowledge-base truth) | **0** across 31 counters |
-| Unapproved sends | **0** |
-| Escalation precision / recall | 1.00 / 1.00 |
-| Message and quote grounding | 100% |
-| Intake field accuracy, 25 dev cases | v1 rules 67% to v2 rules 100% |
-| Intake field accuracy, 12 held-out phrasings | v1 60.4%, v2 91.7% (8 of 12 exact) |
-
-Sabotage tests prove each metric can fail, so a pass means something.
-
-**Read this part:** the v1 and v2 intake rows are two rule-based parsers, not LLM prompts, and v2 was tuned on the 25 dev cases. The held-out row is the fairer number. Four held-out misses are left unfixed on purpose. No LLM run has been made yet, so prompt quality is unmeasured. The prompts are versioned and ready; see below to run them for free.
+The results table above comes from `python -m msafara.evals.results`, which reads the run log. Method, the 75 extra trips and caveats: [docs/eval-results.md](docs/eval-results.md). Sabotage tests prove each metric can fail, and a scripted hostile model tries to break every limit through the tools (`msafara/tests/test_tool_agents.py`), so a pass means something.
 
 ## Prompts
 
-`msafara/prompts/` holds versioned prompts (intake v1/v2, outreach, quote parsing, counter, judge) with an `active.json` switch and a [CHANGELOG](msafara/prompts/CHANGELOG.md). Model output is validated against Pydantic schemas with one retry. If it still fails, the agent escalates to a human.
+`msafara/prompts/` holds versioned prompts (intake v1-v3, sourcing, negotiation, outreach, quote parsing v1-v2, counter, judge) with an `active.json` switch and a [CHANGELOG](msafara/prompts/CHANGELOG.md). Structured output is validated against Pydantic schemas with one retry; tool arguments are validated by the tools. If the model still fails, the rules engine takes that step.
 
 Run the prompt-version comparison on a free backend (a local Local model server model, or a free hosted-model API key):
 
@@ -90,15 +90,16 @@ export MSAFARA_LLM_PROVIDER=local MSAFARA_MODEL=local-model   # or a hosted key:
 bash scripts/run_prompt_eval.sh
 ```
 
-Runs are appended to `msafara/evals/runs.jsonl` with the model's name. A Colab notebook in `notebooks/` does the same with nothing to install.
+Runs are appended to `msafara/evals/runs.jsonl` with a generic model class; the exact model id stays in a git-ignored local log. A Colab notebook in `notebooks/` does the same with nothing to install.
 
 ## Run it
 
 ```bash
 pip install -r requirements-msafara.txt
-python -m pytest -q                         # 74 tests, no API key needed
-python -m msafara.evals.run --label "my run"   # 25 trips + held-out intake
+python -m pytest -q                                   # 96 tests, no API key needed
+python -m msafara.evals.run --workers 8 --label "my run"   # 100 trips + held-out intake
 python -m msafara.evals.run --report
+python -m msafara.evals.results                       # rebuild the results table from the log
 ```
 
 ## Repo map
@@ -106,12 +107,14 @@ python -m msafara.evals.run --report
 | Path | What is in it |
 |---|---|
 | `msafara/graph.py` | LangGraph workflow, human gates, SQLite checkpointing |
-| `msafara/agents.py` | intake, matching, outreach, parsing, negotiation, guardrails |
+| `msafara/agents.py` | intake, sourcing and negotiation agents, outreach, parsing, rules engine, guardrails |
+| `msafara/tools.py` | the tools the agents call, with their limits |
+| `msafara/llm.py` | model backends, native tool calling, the agent loop, usage meter |
 | `msafara/rag.py`, `kb.py`, `seed_kb.py` | chunking, embeddings, Chroma and numpy index, synthetic knowledge base |
-| `msafara/evals/` | cases, metrics, runner, run history |
+| `msafara/evals/` | 100 cases, metrics, parallel runner, run history, results page |
 | `msafara/prompts/` | versioned prompts and changelog |
 | `msafara/simulator.py` | deterministic vendor simulator |
-| `msafara/tests/` | 74 tests |
+| `msafara/tests/` | 96 tests |
 | `msafara/api.py` | FastAPI router that serves the Trip Desk |
 | `index.html`, `demo-api.js` | in-browser demo on GitHub Pages |
 | `graph.py`, `storage.py`, `dispatch.py`, `inbox_poll.py` | the earlier request-tracking workflow |
@@ -121,9 +124,9 @@ The full FastAPI server, Trip Desk page and seeded demo database are not publish
 
 ## Product decisions
 
-- **Bounded negotiation, never autonomous.** The agent counters inside operator-set rules and a capped number of rounds.
+- **The model decides, code holds the line.** The negotiation agent picks accept, counter or escalate and chooses the amount, but only inside limits the tools enforce, and never past a human gate.
 - **Escalate ambiguity to a human.** Partial or unclear vendor replies go back to the coordinator instead of being guessed at.
-- **Runs with zero API keys.** A deterministic rules engine lets anyone demo the whole flow; a model switches on when one is connected.
+- **Runs with zero API keys.** The rules engine runs the whole flow on its own, which makes it both the fallback and the baseline the agents are measured against.
 - **Meet vendors where they already are.** Email and WhatsApp, not a vendor portal nobody will log into.
 
 **How I would measure it:** concurrent requests one coordinator can run, requests that stall on unanswered silence, and time from request to client-ready proposal.
@@ -148,6 +151,10 @@ The full FastAPI server, Trip Desk page and seeded demo database are not publish
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Outbound email dispatch (`dispatch.py`) |
 | `IMAP_HOST` / `IMAP_USER` / `IMAP_PASSWORD` | Inbound email polling (`inbox_poll.py`) |
 | `LLM_API_KEY`, `LLM_API_URL`, `LLM_API_HEADERS`, `MSAFARA_MODEL` | Optional primary model backend (any messages-style API); unset runs the rules engine |
+| `MSAFARA_MODEL_CLASS` | Generic model description written to the public run log |
+| `MSAFARA_PRICE_IN`, `MSAFARA_PRICE_OUT` | USD per million tokens, for the cost metric |
+| `MSAFARA_LLM_SOURCING`, `MSAFARA_LLM_NEGOTIATION` | Set to `0` to put that step back on the rules engine |
+| `MSAFARA_JUDGE=heuristic` | Same rule-based message judge for every system (used for the comparison) |
 | `MSAFARA_LLM_PROVIDER`, `MSAFARA_LLM_KEY`, `MSAFARA_HOSTED_URL`, `MSAFARA_HOSTED_MODEL` | Optional free backends: local Local model server, or a hosted free-tier key |
 
 ## How it was built
@@ -162,4 +169,5 @@ Built by Pryank Wadhera. Product scope, requirements (see `docs/`) and QA are mi
 - Currency is cosmetic in the earlier dashboard: it shows `$` whatever the stored currency.
 - Vendor replies are simulated in the evals. No real vendor has been contacted.
 - WhatsApp replies need a webhook receiver (not included); outbound only for now.
-- LLM prompt quality is not yet measured (see Evals).
+- One eval run per system; small run-to-run differences on the model side are expected.
+- Intake grounding proves a value appears in the request, not that it was read correctly.

@@ -54,7 +54,7 @@ def test_full_trip_on_llm_path_with_negotiation(g):
     t = run_trip(g, stub, dict(CLEAN, hotel="negotiable"))
     assert t["status"] == "confirmed" and t["llm_backend"].startswith("llm:")
     assert {d["generated_by"] for d in t["drafts"] if d["kind"] != "confirm"} == {"llm"}
-    assert t["prompt_versions"]["intake"] == "v2"
+    assert t["prompt_versions"]["intake"] == "v3"
     hotel = next(s for s in t["services"] if s["service_id"] == "hotel")
     assert hotel["counters"]
 
@@ -97,13 +97,21 @@ def test_llm_outreach_invalid_json_falls_back_to_template(g):
     assert t["status"] == "confirmed"
 
 
-def test_llm_intake_garbage_falls_back_to_rules_with_low_confidence_then_escalates(g):
+def test_llm_intake_garbage_falls_back_to_rules(g):
+    """Model output unusable -> the rules parser takes over; a complete rules parse carries on to outreach."""
     from msafara import llm
     llm.set_client(Stub(good_script({"intake": lambda u: "no json here"})))
     graph.set_reply_provider(simulator.make_provider())
     snap = graph.start_trip(g, TEXT, "L6", CLEAN)
-    assert snap["gate"]["gate"] == "escalate_intake" and "confidence" in snap["gate"]["reason"]
     assert any(a["event"] == "llm_failed_fallback_to_rules" for a in snap["trip"]["audit"])
+    assert snap["gate"]["gate"] == "approve_outreach"
+
+
+def test_llm_intake_garbage_with_incomplete_request_still_escalates(g):
+    from msafara import llm
+    llm.set_client(Stub(good_script({"intake": lambda u: "no json here"})))
+    snap = graph.start_trip(g, "Need a hotel in Jaipur for 10 people on 12-15 May 2027", "L6b", CLEAN)
+    assert snap["gate"]["gate"] == "escalate_intake"
 
 
 def test_llm_intake_hallucinated_fields_are_sanitised(g):

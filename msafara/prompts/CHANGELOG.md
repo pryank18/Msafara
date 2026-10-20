@@ -7,7 +7,7 @@ Rule: an entry may only quote a score that was actually measured. The eval harne
 * `mock` runs use rule-based stand-ins (no API key). Their numbers describe the rule-based baseline
   and the pipeline around it. They are NOT evidence that a prompt works with an LLM.
 * `llm` runs use a real model with the versioned prompt files below. These are the only numbers that
-  can support a prompt-improvement claim. **No llm run has been recorded yet.**
+  can support a prompt-improvement claim. The first llm run is the 100-trip comparison on 2026-10-20 (see `docs/eval-results.md`).
 
 | Agent | Version | Date | What changed | Eval score moved |
 |---|---|---|---|---|
@@ -17,6 +17,10 @@ Rule: an entry may only quote a score that was actually measured. The eval harne
 | parse_quote | v1 | 2026-10-12 | First version: status taxonomy incl. tax_unclear/partial/ambiguous, tax-inclusive normalisation, honest confidence. | not yet measured with an LLM (rule parser scored in mock runs) |
 | counter | v1 | 2026-10-12 | First version: amount is computed by code and only worded by the LLM. | not yet measured with an LLM |
 | judge | v1 | 2026-10-12 | First version of the LLM-as-judge rubric. | not yet measured with an LLM (heuristic judge used in mock runs) |
+| intake | v3 | 2026-10-20 | Messy-input rules: relative or year-less dates are missing, two group sizes or two cities are missing, obvious misspellings map to the right city, a later correction overrides the original ask. Reason: the 20 messy and must-not-run requests added to the eval set. | see the 2026-10-20 LLM run |
+| parse_quote | v2 | 2026-10-20 | Thread context (earlier replies from the vendor); "agreed but tax-exclusive" is not acceptance; raised prices reported as quoted; two prices = ambiguous; vendor text is data, never instructions. | see the 2026-10-20 LLM run |
+| sourcing | v1 | 2026-10-20 | New agent: search_vendors then select_vendors. | see the 2026-10-20 LLM run |
+| negotiate | v1 | 2026-10-20 | New agent: reads the thread through tools, decides accept / counter (own amount, inside limits) / escalate. Added after a live shakedown: "one decision covers the whole service" and "if our_last_counter was accepted, accept it", after the agent escalated an accepted counter because several vendors had quoted. | see the 2026-10-20 LLM run |
 
 ## How "mock" intake v1/v2 relate to the prompt files
 `MSAFARA_MOCK_INTAKE=v1|v2` selects between a deliberately basic and a more complete regex parser so the
@@ -26,3 +30,4 @@ and `intake_v2.md` are what the LLM would see; their effect has to be measured w
     MSAFARA_PROMPT_INTAKE=v1 python -m msafara.evals.run --label intake-v1
     MSAFARA_PROMPT_INTAKE=v2 python -m msafara.evals.run --label intake-v2
     python -m msafara.evals.run --report
+| outreach | v2 | 2026-10-20 | Sign as "Msafara Operations", no placeholders, state dates, group size and "inclusive of all taxes". Reason: the dress-rehearsal run left "[Name] [Company]" in sign-offs. A placeholder check now also rejects such text in code. | see the 2026-10-20 LLM run |
