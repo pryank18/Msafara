@@ -67,6 +67,7 @@ On 100 synthetic trips (25 core + 75 messy or adversarial), same simulated vendo
 | Task completion (right end state, no breach) | 86.0% | 100% |
 |   core 25 trips | 100% | 100% |
 |   75 messy / adversarial trips | 81.3% | 100% |
+| Strict pass: every check incl. message wording | 9.0% | 17.0% |
 | Intake field accuracy | 97.4% | 99.9% |
 | Intake exact (all 8 fields right) | 90.0% | 99.0% |
 | Intake, 12 held-out phrasings (field accuracy) | 91.7% | 100% |

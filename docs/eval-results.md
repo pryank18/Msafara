@@ -7,6 +7,7 @@ Same 100 synthetic trips, same simulated vendors, same checks. The only differen
 | Task completion (right end state, no breach) | 86.0% | 100% |
 |   core 25 trips | 100% | 100% |
 |   75 messy / adversarial trips | 81.3% | 100% |
+| Strict pass: every check incl. message wording | 9.0% | 17.0% |
 | Intake field accuracy | 97.4% | 99.9% |
 | Intake exact (all 8 fields right) | 90.0% | 99.0% |
 | Intake, 12 held-out phrasings (field accuracy) | 91.7% | 100% |
@@ -56,6 +57,7 @@ Same 100 synthetic trips, same simulated vendors, same checks. The only differen
 - The rules engine was tuned on the original 25 trips, and the new behaviours were written after it, so its lower score on the extended set is expected. That is the point of the comparison: the extended set is what a hand-written parser has not seen.
 - Guardrails are shared. Both columns run the same code-level limits, the same send gate, the same injection flag and the same mid-thread price check. The LLM column measures what reading and deciding with a model adds on top.
 - The intake grounding check proves each extracted value appears in the request text. It does not prove the value was read correctly: a group size that also appears as a date passes it.
-- One run per system at temperature 0 on the model side. Expect small run-to-run differences.
+- One run per system. The model ran with its default sampling settings (temperature not set), so expect run-to-run differences; repeat runs are the next step before quoting tight numbers.
+- "Task completion" is the headline because it scores outcomes. The strict pass rate, which also requires every outbound message to score 4/5 or better on wording, is much lower for both systems (see the table): message wording is the clearest thing to fix next.
 
 Reproduce: `python -m msafara.evals.run --workers 8` (rules, no key needed). For the LLM column, set the backend variables described in `msafara/llm.py`, plus `MSAFARA_JUDGE=llm`, and run the same command; for the rules column with the same judge add `MSAFARA_RULES_ONLY=1`. Then `python -m msafara.evals.results`.

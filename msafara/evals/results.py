@@ -52,10 +52,22 @@ ROWS = [
 ]
 
 
+STRICT = "Strict pass: every check incl. message wording"
+
+
+def _rows(rules, agents):
+    """(name, rules value, agents value) for every table row, in order."""
+    out = []
+    for name, f in ROWS:
+        out.append((name, f(rules["metrics"]) if rules else "-", f(agents["metrics"]) if agents else "not run yet"))
+        if name.startswith("  75 messy"):
+            out.append((STRICT, _pct(rules["pass_rate"]) if rules else "-", _pct(agents["pass_rate"]) if agents else "-"))
+    return out
+
+
 def table(rules, agents) -> str:
     out = ["| Metric | Rules engine | LLM agents + rules guardrails |", "|---|---|---|"]
-    for name, f in ROWS:
-        out.append(f"| {name} | {f(rules['metrics']) if rules else '-'} | {f(agents['metrics']) if agents else 'not run yet'} |")
+    out += [f"| {n} | {rv} | {av} |" for n, rv, av in _rows(rules, agents)]
     return "\n".join(out)
 
 
@@ -142,7 +154,11 @@ def page(rules, agents) -> str:
         "and the same mid-thread price check. The LLM column measures what reading and deciding with a model adds on top.",
         "- The intake grounding check proves each extracted value appears in the request text. It does not prove the value "
         "was read correctly: a group size that also appears as a date passes it.",
-        "- One run per system at temperature 0 on the model side. Expect small run-to-run differences.",
+        "- One run per system. The model ran with its default sampling settings (temperature not set), so expect "
+        "run-to-run differences; repeat runs are the next step before quoting tight numbers.",
+        "- \"Task completion\" is the headline because it scores outcomes. The strict pass rate, which also requires every "
+        "outbound message to score 4/5 or better on wording, is much lower for both systems (see the table): message "
+        "wording is the clearest thing to fix next.",
         "",
         "Reproduce: `python -m msafara.evals.run --workers 8` (rules, no key needed). For the LLM column, set the backend "
         "variables described in `msafara/llm.py`, plus `MSAFARA_JUDGE=llm`, and run the same command; for the rules column "
@@ -195,8 +211,7 @@ def site_block(rules, agents) -> str:
         ("warn", f"${a['per_trip']['cost_usd']:.3f}", f"model cost per trip<br>{a['per_trip']['seconds']:.0f} s, {a['per_trip']['llm_calls']:g} calls"),
     ]
     rows = []
-    for name, f in ROWS:
-        rv, av = f(r), f(a)
+    for name, rv, av in _rows(rules, agents):
         cls_a = cls_r = ""
         direction = _BETTER.get(name.strip(), "high")
         lr, la = _lead(rv), _lead(av)
@@ -237,7 +252,8 @@ def site_block(rules, agents) -> str:
     </div>
     <p class="ev-note"><b>Read these correctly.</b> Vendors are a deterministic simulator and the dataset, simulator and agents share an author;
     the approver in the eval is scripted. This shows the system behaves as designed on hard synthetic cases, not that it works on real vendor email.
-    One run per system ({_esc(agents['ts'][:10])}, model class: {_esc(agents['model_class'])}, commit <code>{_esc(agents.get('git') or '?')}</code>).
+    One run per system with default sampling ({_esc(agents['ts'][:10])}, model class: {_esc(agents['model_class'])}, commit <code>{_esc(agents.get('git') or '?')}</code>), so expect run-to-run differences.
+    Task completion scores outcomes; the strict pass rate also requires every message to score 4/5 on wording, and is low for both systems: wording is the next thing to fix.
     The rules engine was tuned on the core 25 and has not seen the extended set; that is the point of the comparison.
     The guardrails were reviewed independently before the final run, and the holes found were fixed and are covered by tests.</p>
     <p class="ev-note ev-links">Full method, every remaining miss and how to reproduce:

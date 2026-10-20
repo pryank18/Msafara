@@ -60,6 +60,8 @@ Not safe:
 * Neural embeddings (the retriever is hashing TF-IDF in Chroma), pgvector/Supabase, inbound WhatsApp.
 * "Improved X% across prompt versions": only one prompt set has an LLM run.
 * Generalising the 100% figures beyond this synthetic set.
+* "100% pass". The 100% is task completion. The strict pass rate, which also requires every message to score 4/5 on
+  wording, is 17% for the LLM agents and 9% for the rules engine; message wording is the next thing to fix.
 
 Interview line, accurate version:
 * "The model decides, the code holds the line. The negotiation agent reads the thread through tools and proposes a
