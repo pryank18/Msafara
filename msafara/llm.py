@@ -7,7 +7,7 @@
   - Primary backend: LLM_API_KEY + LLM_API_URL (a messages-style endpoint: JSON body with
     model, max_tokens, system, messages; response with content[].text). Extra request headers
     the endpoint needs go in LLM_API_HEADERS as a JSON object. Model id: MSAFARA_MODEL.
-  - Local backend: MSAFARA_LLM_PROVIDER=local (LOCAL_LLM_HOST optional).
+  - Local backend: MSAFARA_LLM_PROVIDER=local, a model server on your own machine (LOCAL_LLM_HOST optional).
   - Hosted backend: MSAFARA_LLM_KEY + MSAFARA_HOSTED_URL (a generateContent-style endpoint; may
     contain {model} and {key}) + MSAFARA_HOSTED_MODEL. If the URL has no {key}, the key is sent in
     the header named by MSAFARA_HOSTED_KEY_HEADER (default x-api-key).
@@ -162,9 +162,9 @@ class ApiClient:
 
 
 class LocalClient:
-    """Fully free, no-signup backend: a model server running on your own machine.
+    """Fully free, no-signup backend: a model server running on your own machine (chat endpoint at /api/chat).
 
-    MSAFARA_LLM_PROVIDER=local, MSAFARA_MODEL=<local tag, default local-model>, LOCAL_LLM_HOST optional.
+    MSAFARA_LLM_PROVIDER=local, MSAFARA_MODEL=<the local model's tag>, LOCAL_LLM_HOST optional.
     Small local models are weaker than hosted ones; label results with the model tag.
     """
     default_model = "local-model"

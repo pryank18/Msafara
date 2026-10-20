@@ -113,10 +113,10 @@ The results table above comes from `python -m msafara.evals.results`, which read
 
 `msafara/prompts/` holds versioned prompts (intake v1-v3, sourcing, negotiation, outreach, quote parsing v1-v2, counter, judge) with an `active.json` switch and a [CHANGELOG](msafara/prompts/CHANGELOG.md). Structured output is validated against Pydantic schemas with one retry; tool arguments are validated by the tools. If the model still fails, the rules engine takes that step.
 
-Run the prompt-version comparison on a free backend (a local Local model server model, or a free hosted-model API key):
+Run the prompt-version comparison on a free backend (a model server on your own machine, or a free hosted-model API key):
 
 ```bash
-export MSAFARA_LLM_PROVIDER=local MSAFARA_MODEL=local-model   # or a hosted key: see msafara/README.md
+export MSAFARA_LLM_PROVIDER=local MSAFARA_MODEL=<your local model tag>   # or a hosted key: see msafara/README.md
 bash scripts/run_prompt_eval.sh
 ```
 
@@ -185,7 +185,7 @@ The full FastAPI server, Trip Desk page and seeded demo database are not publish
 | `MSAFARA_PRICE_IN`, `MSAFARA_PRICE_OUT` | USD per million tokens, for the cost metric |
 | `MSAFARA_LLM_SOURCING`, `MSAFARA_LLM_NEGOTIATION` | Set to `0` to put that step back on the rules engine |
 | `MSAFARA_JUDGE=heuristic` | Same rule-based message judge for every system (used for the comparison) |
-| `MSAFARA_LLM_PROVIDER`, `MSAFARA_LLM_KEY`, `MSAFARA_HOSTED_URL`, `MSAFARA_HOSTED_MODEL` | Optional free backends: local Local model server, or a hosted free-tier key |
+| `MSAFARA_LLM_PROVIDER`, `MSAFARA_LLM_KEY`, `MSAFARA_HOSTED_URL`, `MSAFARA_HOSTED_MODEL` | Optional free backends: a local model server, or a hosted free-tier key |
 
 ## How it was built
 

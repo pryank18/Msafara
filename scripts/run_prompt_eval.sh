@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Free prompt-version eval. Pick ONE backend:
-#   Local model server (no signup, runs on your machine):  local pull local-model ; export MSAFARA_LLM_PROVIDER=local
+#   Local model server (no signup, runs on your machine):  export MSAFARA_LLM_PROVIDER=local MSAFARA_MODEL=<tag>
 #   Free hosted-model API key:                 export MSAFARA_LLM_KEY=... MSAFARA_HOSTED_URL=... MSAFARA_HOSTED_MODEL=...
 # Then: bash scripts/run_prompt_eval.sh
 set -euo pipefail

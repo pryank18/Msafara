@@ -76,22 +76,7 @@ no authentication on the API; one operator, no concurrency model beyond a proces
 
 Two zero-cost routes; both write labelled rows to `msafara/evals/runs.jsonl`.
 
-A. Local model server, no account and no key (needs ~8 GB RAM; runs on your own machine):
+A. A local model server, no account and no key (needs ~8 GB RAM; runs on your own machine). Start any server that
+   exposes a chat endpoint at /api/chat, then:
 
-    local pull local-model          # or a smaller tag such as local-model
-    export MSAFARA_LLM_PROVIDER=local MSAFARA_MODEL=local-model
-    bash scripts/run_prompt_eval.sh
-
-B. Free hosted-model API key (no card):
-
-    export MSAFARA_LLM_KEY=...              # keep out of the repo; .env is gitignored
-    export MSAFARA_HOSTED_URL=...           # the provider's generate endpoint; may contain {model} and {key}
-    export MSAFARA_HOSTED_MODEL=...         # the model id your account lists
-    bash scripts/run_prompt_eval.sh
-
-C. Any messages-style API (primary backend):
-
-    export LLM_API_KEY=... LLM_API_URL=... MSAFARA_MODEL=...
-    export LLM_API_HEADERS='{"header-name": "value"}'   # only if the endpoint needs extra headers
-
-Results are labelled with the model used and support only "ran prompt versions v1 and v2 on <that model>", not any claim about the default model.
+    export MSAFARA_LLM_PROVIDER=local MSAFARA_MODEL=<your local model tag>
