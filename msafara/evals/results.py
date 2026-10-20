@@ -163,6 +163,90 @@ def readme_block(rules, agents) -> str:
                       f"[docs/eval-results.md](docs/eval-results.md).", "", END])
 
 
+# ------------------------------------------------------------------ live demo page (index.html "Agent Evals" tab)
+SITE = ROOT / "index.html"
+S_START, S_END = "<!-- EVALS:START -->", "<!-- EVALS:END -->"
+REPO = "https://github.com/pryank18/Msafara"
+# which direction is better, per table row (by row name); used only for colouring
+_BETTER = {"Price-limit violations": "low", "Model calls per trip": None, "Tokens per trip (in / out)": None,
+           "Cost per trip": None, "Wall time per trip": None, "Sends without approval (must be 0)": None}
+
+
+def _esc(x: str) -> str:
+    import html
+    return html.escape(str(x))
+
+
+def _lead(v: str):
+    import re as _re
+    m = _re.match(r"\s*\$?([\d.,]+)", v.replace(",", ""))
+    return float(m.group(1)) if m else None
+
+
+def site_block(rules, agents) -> str:
+    if not (rules and agents):
+        return f"{S_START}\n<h1>Agent evals</h1><p class=\"subtitle\">No comparison run logged yet.</p>\n{S_END}"
+    r, a = rules["metrics"], agents["metrics"]
+    kpis = [
+        ("success", _pct(a["task_completion_rate"]), f"task completion<br>rules engine: <b>{_pct(r['task_completion_rate'])}</b>"),
+        ("success", str(a["price_limit_violations"]), f"price-limit violations<br>rules engine: <b>{r['price_limit_violations']}</b>"),
+        ("info", str(a["unapproved_sends"]), f"sends without approval<br>of {a['messages_sent']:,} messages"),
+        ("success", f"{a['escalation_recall']:.2f}", f"escalation recall<br>rules engine: <b>{r['escalation_recall']:.2f}</b>"),
+        ("warn", f"${a['per_trip']['cost_usd']:.3f}", f"model cost per trip<br>{a['per_trip']['seconds']:.0f} s, {a['per_trip']['llm_calls']:g} calls"),
+    ]
+    rows = []
+    for name, f in ROWS:
+        rv, av = f(r), f(a)
+        cls_a = cls_r = ""
+        direction = _BETTER.get(name.strip(), "high")
+        lr, la = _lead(rv), _lead(av)
+        if direction and lr is not None and la is not None and lr != la:
+            a_better = (la > lr) if direction == "high" else (la < lr)
+            cls_a, cls_r = ("ev-better", "ev-worse") if a_better else ("ev-worse", "")
+        sub = ' class="ev-sub"' if name.startswith("  ") else ""
+        rows.append(f'<tr{sub}><td>{_esc(name.strip())}</td><td class="{cls_r}">{_esc(rv)}</td><td class="{cls_a}">{_esc(av)}</td></tr>')
+    k = "".join(f'<div class="stat-card accent-{c}"><div class="num">{_esc(n)}</div><div class="label">{lab}</div></div>' for c, n, lab in kpis)
+    return f"""{S_START}
+    <h1>LLM agents vs the rules engine</h1>
+    <p class="subtitle">100 synthetic trips: 25 core plus 75 written to break things. Same simulated vendors, same checks, same judge for both columns.
+    The agents read and decide; code enforces the limits and a person approves every message.</p>
+    <div class="stats-strip ev-kpis">{k}</div>
+    <div class="ev-table-wrap"><table>
+      <thead><tr><th>Metric</th><th>Rules engine</th><th>LLM agents + rules guardrails</th></tr></thead>
+      <tbody>{''.join(rows)}</tbody>
+    </table></div>
+    <div class="ev-grid">
+      <div class="ev-box"><h3>How the agents decide</h3><ul>
+        <li><b>Intake</b> turns a messy request into a brief; every value must appear in the text.</li>
+        <li><b>Sourcing</b> calls <code>search_vendors</code> and picks 3-5 eligible vendors.</li>
+        <li><b>Reply reading</b> extracts status, tax-inclusive rate and availability, with the thread so far.</li>
+        <li><b>Negotiation</b> calls <code>check_vendor_status</code>, <code>get_price_limits</code>, then <code>propose_counter</code>, <code>accept_quote</code> or <code>escalate_to_human</code>.</li>
+      </ul></div>
+      <div class="ev-box"><h3>What the code still enforces</h3><ul>
+        <li>Counters stay within 10% of the quote, above the floor, max 2 rounds; the tool refuses anything else.</li>
+        <li>No automatic accept above the past-quote anchor + 10%.</li>
+        <li>Unclear, partial, silent or suspicious replies can only be escalated.</li>
+        <li>No tool can send: every message waits at a human approval gate.</li>
+      </ul></div>
+      <div class="ev-box"><h3>What the 75 new trips throw at it</h3><ul>
+        <li>Typos, chat-style and forwarded requests; a correction after the first ask.</li>
+        <li>Requests that must not run: "next month", two cities, two group sizes, no year.</li>
+        <li>Vendors who raise the price after a counter, withdraw rooms, or say "agreed" then add tax.</li>
+        <li>Instructions to the system hidden in replies, a deposit request to a new bank account, prices like "7.4k".</li>
+      </ul></div>
+    </div>
+    <p class="ev-note"><b>Read these correctly.</b> Vendors are a deterministic simulator and the dataset, simulator and agents share an author;
+    the approver in the eval is scripted. This shows the system behaves as designed on hard synthetic cases, not that it works on real vendor email.
+    One run per system ({_esc(agents['ts'][:10])}, model class: {_esc(agents['model_class'])}, commit <code>{_esc(agents.get('git') or '?')}</code>).
+    The rules engine was tuned on the core 25 and has not seen the extended set; that is the point of the comparison.
+    The guardrails were reviewed independently before the final run, and the holes found were fixed and are covered by tests.</p>
+    <p class="ev-note ev-links">Full method, every remaining miss and how to reproduce:
+    <a href="{REPO}/blob/main/docs/eval-results.md" target="_blank" rel="noopener">eval write-up</a> ·
+    <a href="{REPO}/tree/main/msafara" target="_blank" rel="noopener">agent code</a> ·
+    <a href="{REPO}/blob/main/msafara/tools.py" target="_blank" rel="noopener">tools and limits</a></p>
+{S_END}"""
+
+
 def main():
     rules, agents = latest("mock"), latest("llm")
     PAGE.write_text(page(rules, agents))
@@ -173,7 +257,11 @@ def main():
     else:
         text = text.replace("\n## What it will not do", "\n## Results: LLM agents vs rules\n\n" + block + "\n\n## What it will not do", 1)
     README.write_text(text)
-    print(f"wrote {PAGE.relative_to(ROOT)} and the README results block")
+    if SITE.exists() and S_START in SITE.read_text():
+        site = SITE.read_text()
+        site = re.sub(re.escape(S_START) + r".*?" + re.escape(S_END), lambda _: site_block(rules, agents), site, flags=re.S)
+        SITE.write_text(site)
+    print(f"wrote {PAGE.relative_to(ROOT)}, the README results block and the site's Agent Evals tab")
 
 
 if __name__ == "__main__":
