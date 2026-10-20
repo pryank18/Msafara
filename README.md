@@ -6,7 +6,8 @@
 ![langgraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C)
 ![rag](https://img.shields.io/badge/RAG-Chroma%20%C2%B7%20442%20chunks-F5A524)
 ![tests](https://img.shields.io/badge/tests-102%20passing-2EA043)
-![bound violations](https://img.shields.io/badge/bound%20violations-0-2EA043)
+![completion](https://img.shields.io/badge/100%20trips-100%25%20complete-2EA043)
+![limit violations](https://img.shields.io/badge/price--limit%20violations-0-2EA043)
 ![agents](https://img.shields.io/badge/agents-tool%20calling-6E56CF)
 ![llm](https://img.shields.io/badge/runs%20with-no%20API%20key-555)
 
@@ -54,6 +55,35 @@ One shared trip state flows through a single router node, so every decision is v
 | Outreach | wording of each request | (structured output) | any price not on file, the floor or internal terms swaps the text for a template |
 
 Tool calling is native on all three backends (a messages-style API, a local model server, a hosted generateContent-style API) behind one loop in `msafara/llm.py`. A refused tool call goes back to the model as an error it can correct. If no decision arrives within the step limit, the rules engine decides instead, and the trip records it. No tool can send anything: a counter is a draft until a person approves it.
+
+## Results: LLM agents vs rules
+
+<!-- RESULTS:START -->
+
+On 100 synthetic trips (25 core + 75 messy or adversarial), same simulated vendors and checks for both columns.
+
+| Metric | Rules engine | LLM agents + rules guardrails |
+|---|---|---|
+| Task completion (right end state, no breach) | 86.0% | 100% |
+|   core 25 trips | 100% | 100% |
+|   75 messy / adversarial trips | 81.3% | 100% |
+| Intake field accuracy | 97.4% | 99.9% |
+| Intake exact (all 8 fields right) | 90.0% | 99.0% |
+| Intake, 12 held-out phrasings (field accuracy) | 91.7% | 100% |
+| Price-limit violations | 4 | 0 |
+| Sends without approval (must be 0) | 0 of 1,168 | 0 of 1,183 |
+| Escalation precision / recall (trip) | 0.87 / 0.90 | 1.00 / 1.00 |
+| Escalation precision / recall (service) | 0.93 / 0.91 | 1.00 / 1.00 |
+| Vendor-reply parse accuracy | 98.0% | 99.9% |
+| Outbound message quality (same model judge, both columns) | 27.2% | 76.8% |
+| Model calls per trip | 0 | 32.7 |
+| Tokens per trip (in / out) | 0 / 0 | 52,585 / 12,890 |
+| Cost per trip | $0 | $0.0117 |
+| Wall time per trip | 0.5 s | 73.6 s |
+
+Runs: rules 2026-10-20; LLM agents 2026-10-20 (small hosted LLM). Method, caveats and how to reproduce: [docs/eval-results.md](docs/eval-results.md).
+
+<!-- RESULTS:END -->
 
 ## What it will not do
 

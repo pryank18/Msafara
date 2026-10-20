@@ -22,7 +22,9 @@ def latest(mode: str, n: int = 100):
 
 
 def _pct(x):
-    return "-" if x is None else f"{x:.0%}"
+    if x is None:
+        return "-"
+    return f"{x:.0%}" if x in (0, 1) else f"{x:.1%}"
 
 
 def _num(x):
@@ -85,7 +87,14 @@ def page(rules, agents) -> str:
             f"- Tool calls refused by a guardrail inside a tool (then corrected or escalated): {a.get('tool_refusals', 0)}.",
             f"- Trips that crashed: {a.get('crashed', 0)}.",
             "",
+            "**What the LLM run still got wrong** (every non-wording failure, from the run log):",
         ]
+        misses = [(f["id"], w) for f in agents["failed_cases"] for w in f["why"] if not w.startswith("message quality")]
+        lines += [f"- `{cid}`: {w[:160]}" for cid, w in misses] or ["- nothing outside message wording"]
+        wq = sum(1 for f in agents["failed_cases"] if any(w.startswith("message quality") for w in f["why"]))
+        lines += [f"- Message wording: {wq} trips had at least one message the judge scored below 4/5. Most notes point "
+                  f"at the request spec itself (the activity is only \"guided group activity\"; transport is billed in "
+                  f"vehicle-days, one more than the nights, which reads as a mismatch), so they apply to both columns.", ""]
     lines += [
         "## How the eval works",
         "",
