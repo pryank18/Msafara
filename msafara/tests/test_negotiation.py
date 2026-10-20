@@ -115,8 +115,9 @@ def _reply_round(rate, firm, prev_rate=8000, anchor=7200, floor=6000):
 
 
 def test_firm_reply_steps_up_to_walk_away_not_repeat():
-    # the original bug: vendor says "best we can do", agent re-sent the same ask
-    s = _reply_round(8500, firm=True); A.decide_service(s, POL)
+    # the original bug: vendor holds at 8,500 and says "best we can do", agent re-sent the same ask
+    # (the vendor holds rather than raises: a raise after our counter is escalated by its own guardrail)
+    s = _reply_round(8500, firm=True, prev_rate=8500); A.decide_service(s, POL)
     assert s.decision == "counter" and "INR 7,920" in s.reasoning and "best price" in s.reasoning
     assert A.next_counter(s, "V1", s.quotes["V1"], POL) > s.counters[-1].counter_rate
 

@@ -113,3 +113,116 @@ HELDOUT = [
     dict(id="h12", text="Please find a 4-star hotel in Arusha for 20 delegates from 2027-05-17 to 2027-05-20. Budget about 14,000 USD.",
          truth=dict(city="Arusha", check_in=D(2027, 5, 17), check_out=D(2027, 5, 20), nights=3, pax=20, hotel_star=4, budget_total=14000.0, currency="USD")),
 ]
+
+
+# =============================================================================================
+# EXTENDED SET (75 more trips -> 100). Written to break things, not to be passed:
+#   * M-cases: messy but complete requests (typos, chat style, forwarded mail, a correction after the
+#     original ask, headcount instead of "people"). A careful reader can extract every field.
+#   * X-cases: requests a correct system must NOT run on (relative dates, two cities, two group sizes,
+#     unsupported city, no star rating, no year). Expected outcome: escalate at intake.
+#   * V-cases: complete requests in varied phrasing, paired with vendor behaviours that push past limits,
+#     change terms mid-thread, inject instructions, or quote in informal formats (simulator.ADVERSARIAL).
+M = [
+    case("m01", "Fwd: group enquiry\n\n---\nHi team, pls quote Jaipr, 4 star, 12 ppl, 9-12 Feb 2027, budget INR 3 lakh. thx",
+         "Jaipur", D(2027, 2, 9), D(2027, 2, 12), 12, 4, 300000.0, "INR"),
+    case("m02", "zanzibar!! 4 star pls. we r 10. 3rd to 7th of june 2027. $8k max",
+         "Zanzibar", D(2027, 6, 3), D(2027, 6, 7), 10, 4, 8000.0, "USD"),
+    case("m03", "Original request: Goa, 3-star, 8 guests, 2027-03-01 to 2027-03-04.\nUPDATE: make that 10 guests and 4-star please, "
+                "same dates. Budget INR 1.5 lakh.",
+         "Goa", D(2027, 3, 1), D(2027, 3, 4), 10, 4, 150000.0, "INR"),
+    case("m04", "Arusha safari group - eleven travellers - five-star lodge - 2027-08-20 to 2027-08-24 - USD 16,000",
+         "Arusha", D(2027, 8, 20), D(2027, 8, 24), 11, 5, 16000.0, "USD"),
+    case("m05", "Could you check a 5* place in Stone Town for 6 of us, 14/02/2027 to 17/02/2027? budget roughly 4500 USD",
+         "Zanzibar", D(2027, 2, 14), D(2027, 2, 17), 6, 5, 4500.0, "USD"),
+    case("m06", "jaipur trip for the family: 3 adults + 4 kids, 3 star, 18 Dec 2027 for 3 nights, around Rs 90,000",
+         "Jaipur", D(2027, 12, 18), D(2027, 12, 21), 7, 3, 90000.0, "INR"),
+    case("m07", "Goa offsite. Headcount: 26. Hotel: 4 star. Check-in 2027-09-10, check-out 2027-09-13. Budget: 9 lakh",
+         "Goa", D(2027, 9, 10), D(2027, 9, 13), 26, 4, 900000.0, "INR"),
+    case("m08", "Hello,\nWe'd like to book Nungwi beach for our team of 16 (5-star), from the 1st of October 2027 until the 5th "
+                "of October 2027. Budget $20,000.\nRegards, Anna",
+         "Zanzibar", D(2027, 10, 1), D(2027, 10, 5), 16, 5, 20000.0, "USD"),
+    case("m09", "ARUSHA | 3 STAR | 9 PAX | 05/11/2027-09/11/2027 | USD 3,600",
+         "Arusha", D(2027, 11, 5), D(2027, 11, 9), 9, 3, 3600.0, "USD"),
+    case("m10", "need hotels in goa for 14 ppl (4star) from jan 20 to jan 24 2027 budget 4 lakhs",
+         "Goa", D(2027, 1, 20), D(2027, 1, 24), 14, 4, 400000.0, "INR"),
+]
+
+X = [
+    case("x01", "Jaipur, 4-star, 15 people, sometime next month, budget 4 lakh",
+         "Jaipur", None, None, 15, 4, 400000.0, "INR", incomplete=True),
+    case("x02", "Goa or Jaipur, not decided yet. 10 people, 3-star, 2027-05-01 to 2027-05-04",
+         None, D(2027, 5, 1), D(2027, 5, 4), 10, 3, None, None, incomplete=True),
+    case("x03", "Zanzibar 4 star 2027-07-10 to 2027-07-14, 12 or maybe 14 people, $11k",
+         "Zanzibar", D(2027, 7, 10), D(2027, 7, 14), None, 4, 11000.0, "USD", incomplete=True),
+    case("x04", "Arusha for 8 guests, 2027-04-10 to 2027-04-13, a nice hotel, budget USD 6,000",
+         "Arusha", D(2027, 4, 10), D(2027, 4, 13), 8, None, 6000.0, "USD", incomplete=True),
+    case("x05", "Book something in Mombasa for 10 people, 4-star, 2027-06-01 to 2027-06-04",
+         None, D(2027, 6, 1), D(2027, 6, 4), 10, 4, None, None, incomplete=True),
+    case("x06", "Goa, 4-star, 12 guests, from 14 March for 4 nights, budget 3 lakh",
+         "Goa", None, None, 12, 4, 300000.0, "INR", incomplete=True),
+    case("x07", "Jaipur 5 star for the usual group, 2027-10-02 to 2027-10-05, budget 8 lakh",
+         "Jaipur", D(2027, 10, 2), D(2027, 10, 5), None, 5, 800000.0, "INR", incomplete=True),
+    case("x08", "Zanzibar, 3-star, 6 pax, check-in 2027-02-10, budget $2,000",
+         "Zanzibar", D(2027, 2, 10), None, 6, 3, 2000.0, "USD", incomplete=True),
+    case("x09", "Can you sort the Arusha trip? Same as last time.",
+         "Arusha", None, None, None, None, None, None, incomplete=True),
+    case("x10", "4-star in Goa for 18 people after Diwali, about a week, budget 6 lakh",
+         "Goa", None, None, 18, 4, 600000.0, "INR", incomplete=True),
+]
+
+
+def _v_cases():
+    from datetime import timedelta
+    areas = {"Jaipur": ["Jaipur", "the Pink City (Jaipur)"], "Goa": ["North Goa", "Goa"],
+             "Zanzibar": ["Stone Town, Zanzibar", "Nungwi, Zanzibar"], "Arusha": ["Arusha"]}
+    cities = ["Jaipur", "Goa", "Zanzibar", "Arusha"]
+    word = {3: "three", 4: "four", 5: "five"}
+    adv = S.ADVERSARIAL
+    std = ["clean", "negotiable", "two_round", "firm_slightly_high", "firm_high", "mixed_one_ambiguous",
+           "partial_all", "declines_all", "silent_all", "tax_unclear_all", "ambiguous_all"]
+    cats = ["hotel", "transport", "activity"]
+    out = []
+    for i in range(55):
+        city = cities[i % 4]
+        cur = "INR" if city in ("Jaipur", "Goa") else "USD"
+        star = 3 + (i % 3)
+        pax = 4 + (i * 7) % 25
+        nights = 2 + i % 4
+        d1 = D(2027, 1 + (i * 5) % 12, 3 + (i * 3) % 16)
+        d2 = d1 + timedelta(days=nights)
+        per = {3: 3500, 4: 7000, 5: 15000}[star] if cur == "INR" else {3: 110, 4: 220, 5: 320}[star]
+        budget = float(round(per * pax * nights * (1.6 if cur == "INR" else 1.5), -3))
+        if cur == "INR":
+            bstr = [f"INR {budget:,.0f}", f"Rs {budget / 100000:g} lakh" if budget % 10000 == 0 else f"Rs {budget:,.0f}",
+                    f"₹{budget:,.0f}"][i % 3]
+        else:
+            bstr = [f"${budget:,.0f}", f"USD {budget / 1000:g}k", f"{budget:,.0f} USD"][i % 3]
+        area = areas[city][i % len(areas[city])]
+        t = i % 6
+        if t in (0, 5) and d1.month != d2.month:
+            t = 1
+        text = [
+            f"{star}-star in {area} for {pax} people, {d1.day}-{d2.day} {d1:%B %Y}, budget {bstr}",
+            f"Group of {pax} heading to {area} from {d1:%Y-%m-%d} to {d2:%Y-%m-%d}. {star} star hotel. Budget {bstr}.",
+            f"{area}: {pax} pax, {star}*, {d1:%d/%m/%Y} - {d2:%d/%m/%Y}, {bstr}",
+            f"Hi team, please quote a {word[star]}-star property in {area} for {pax} guests arriving {d1.day} {d1:%b %Y} for "
+            f"{nights} nights. Budget {bstr}.",
+            f"Need {area} {star} star, pax {pax}, check in {d1:%Y-%m-%d}, check out {d2:%Y-%m-%d}, budget {bstr}",
+            f"We're {pax} travellers looking at {area}, {d1:%B} {d1.day} to {d2.day}, {d1.year}, {star}-star, budget around {bstr}",
+        ][t]
+        # 33 adversarial assignments (each behaviour 3-4 times, rotating service), 22 standard ones
+        if i < 33:
+            prof = {cats[i % 3]: adv[i % len(adv)]}
+            if i % 4 == 0:
+                prof[cats[(i + 1) % 3]] = std[i % 3]          # a second, ordinary behaviour on another service
+        else:
+            prof = {cats[i % 3]: std[i % len(std)]}
+        out.append(case(f"v{i + 1:02d}", text, city, d1, d2, pax, star, budget, cur, prof))
+    return out
+
+
+V = _v_cases()
+EXTRA = M + X + V
+ALL = CASES + EXTRA
+assert len(ALL) == 100 and len({c["id"] for c in ALL}) == 100

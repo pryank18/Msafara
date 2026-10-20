@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from . import kb, llm, rag
 from .models import (HARD_MAX_DISCOUNT_PCT, Anchor, Candidate, CounterRecord, Escalation, OutreachDraft,
                      Policy, Quote, ServiceLine, TripBrief, TripState)
-from .textutil import ceil_money, currency_numbers, fmt_money, med, to_float
+from .textutil import ceil_money, currency_numbers, fmt_money, med, money_mentions, percentages, to_float
 
 REQUIRED_FIELDS = ["city", "check_in", "check_out", "pax", "hotel_star"]
 
@@ -212,19 +212,98 @@ def finalize_brief(b: TripBrief) -> TripBrief:
     return b
 
 
+_NUMWORD = {v: k for k, v in _WORDNUM.items() if " " not in k and "-" not in k}
+
+
+def _plain_numbers(text: str) -> list[float]:
+    return [to_float(m.group(1)) for m in re.finditer(r"(?<![\d.])(\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)", text)]
+
+
+def _int_supported(n: int, text: str) -> bool:
+    nums = [int(x) for x in _plain_numbers(text) if float(x).is_integer()]
+    if n in nums or re.search(rf"\b{_NUMWORD.get(n, '@@')}\b", text, re.I):
+        return True
+    words = [_WORDNUM[w.lower()] for w in re.findall(rf"\b({_WORD_ALT})\b", text, re.I)]
+    pool = nums + words
+    return any(a + b == n for i, a in enumerate(pool) for b in pool[i + 1:])
+
+
+def _amount_supported(x: float, text: str) -> bool:
+    if any(abs(x - n) < 0.5 for n in _plain_numbers(text)):
+        return True
+    return any(abs(x - _scale(m.group(1), m.group(2))) < 0.5 for m in re.finditer(_AMT, text, re.I))
+
+
+def _fuzzy_city(text: str) -> Optional[str]:
+    import difflib
+    hit = kb.city_in_text(text)
+    if hit:
+        return hit
+    for tok in re.findall(r"[A-Za-z]{4,}", text):
+        m = difflib.get_close_matches(tok.lower(), list(kb.CITY_ALIASES), n=1, cutoff=0.8)
+        if m:
+            return kb.CITY_ALIASES[m[0]]
+    return None
+
+
+def _date_supported(d, text: str) -> bool:
+    low = text.lower()
+    if d.isoformat() in text or f"{d.day}/{d.month}/{d.year}" in text or f"{d.day:02d}/{d.month:02d}/{d.year}" in text:
+        return True
+    month_names = [k for k, v in _MONTHS.items() if v == d.month]
+    has_month = any(re.search(rf"\b{m}\b", low) for m in month_names)
+    has_day = re.search(rf"(?<!\d){d.day}(?!\d)", text) is not None
+    has_year = str(d.year) in text
+    return has_month and has_day and has_year
+
+
+def ground_brief(text: str, b: TripBrief) -> list[str]:
+    """Guardrail on LLM intake: every extracted value must be traceable to the request text.
+    Ungrounded fields are cleared, so the trip escalates instead of running on a guess."""
+    cleared = []
+    if b.city and _fuzzy_city(text) != (kb.canonical_city(b.city) or b.city):
+        b.city = None; cleared.append("city")
+    if b.pax is not None and not _int_supported(int(b.pax), text):
+        b.pax = None; cleared.append("pax")
+    if b.hotel_star is not None:
+        w = {3: "three", 4: "four", 5: "five"}.get(b.hotel_star, "@@")
+        if not re.search(rf"\b(?:{b.hotel_star}|{w})\s*(?:-|\s)?\s*(?:star|\*)", text, re.I):
+            b.hotel_star = None; cleared.append("hotel_star")
+    if b.check_in and not _date_supported(b.check_in, text):
+        b.check_in = None; cleared.append("check_in")
+    if b.check_out and not _date_supported(b.check_out, text):
+        n = (b.check_out - b.check_in).days if b.check_in else None
+        if not (n and re.search(rf"\b(?:{n}|{_NUMWORD.get(n, '@@')})\s+nights?\b", text, re.I)):
+            b.check_out = None; cleared.append("check_out")
+    if b.budget_total is not None and not _amount_supported(float(b.budget_total), text):
+        b.budget_total, b.currency = None, None; cleared.append("budget_total")
+    return cleared
+
+
 def run_intake(text: str, trip: Optional[TripState] = None) -> TripBrief:
     if llm.mock_mode():
         brief = mock_intake(text, os.environ.get("MSAFARA_MOCK_INTAKE", "v2"))
         brief.confidence = 0.9
-    else:
-        try:
-            brief = llm.structured_call("intake", text, TripBrief)
-        except llm.LLMOutputError as e:
-            if trip:
-                trip.log("agent:intake", "intake", "llm_failed_fallback_to_rules", error=str(e)[:200])
-            brief = mock_intake(text, "v2")
-            brief.confidence = 0.5
-    return finalize_brief(brief)
+        return finalize_brief(brief)
+    rules = finalize_brief(mock_intake(text, "v2"))
+    try:
+        brief = llm.structured_call("intake", text, TripBrief)
+    except llm.LLMOutputError as e:
+        if trip:
+            trip.log("agent:intake", "intake", "llm_failed_fallback_to_rules", error=str(e)[:200])
+        rules.confidence = min(rules.confidence, 0.5) if rules.missing else 0.7
+        return rules
+    cleared = ground_brief(text, brief)
+    brief = finalize_brief(brief)
+    if trip:
+        if cleared:
+            trip.log("guardrail", "intake", "llm_fields_not_in_text_cleared", fields=cleared)
+        diff = {f: dict(llm=str(getattr(brief, f)), rules=str(getattr(rules, f))) for f in
+                ("city", "check_in", "check_out", "pax", "hotel_star", "budget_total")
+                if getattr(rules, f) is not None and getattr(brief, f) is not None and getattr(rules, f) != getattr(brief, f)}
+        if diff:
+            trip.log("guardrail", "intake", "llm_rules_disagree", fields=diff)
+    return brief
 
 
 # =========================================================== SERVICES, POLICY, ANCHORS
@@ -299,20 +378,34 @@ def match_vendors(svc: ServiceLine, brief: TripBrief, policy: Policy, max_n: int
 
 
 # =========================================================== TEXT GUARDRAILS
+_PLACEHOLDER = re.compile(r"\[(?:your |vendor |company |sender )?(?:name|company|contact|title|details|signature|phone|email)[^\]]*\]|\{\{|<name>", re.I)
 _FORBIDDEN_WORDS = re.compile(r"\b(floor rate|markup|mark-up|walk-away|our budget)\b", re.I)
 
 
-def validate_text(body: str, allowed: set[float], floor: Optional[float] = None) -> list[str]:
-    """Return a list of problems (empty = safe to send). Used on LLM output."""
+_COMMIT = re.compile(r"\b(?:deposit|advance payment|wire|bank (?:account|transfer)|we (?:hereby )?confirm (?:the|this|our) booking|"
+                     r"booking is confirmed|we accept your (?:rate|quote|offer)|payment (?:will be|has been) (?:made|sent))\b", re.I)
+
+
+def validate_text(body: str, allowed: set[float], floor: Optional[float] = None, allowed_text: str = "") -> list[str]:
+    """Return a list of problems (empty = safe to send). Used on every model-written outbound message.
+    Amounts are read with or without a currency marker ('INR 6,000', '6k', '6,000 per room')."""
     problems = []
-    for n in currency_numbers(body):
+    amounts = money_mentions(body)
+    for n in amounts:
         if not any(abs(n - a) < 0.5 for a in allowed):
             problems.append(f"ungrounded amount {n:,.0f}")
-    if floor is not None and any(abs(n - floor) < 0.5 for n in currency_numbers(body)) and \
+    if floor is not None and any(abs(n - floor) < 0.5 for n in amounts) and \
             not any(abs(floor - a) < 0.5 for a in allowed):
         problems.append("floor rate disclosed")
+    stray = [p for p in percentages(body) if p not in allowed_text]
+    if stray:
+        problems.append(f"percentage not on file: {stray[0]}")
+    if _COMMIT.search(body):
+        problems.append("commitment or payment language")
     if _FORBIDDEN_WORDS.search(body):
         problems.append("mentions internal terms")
+    if _PLACEHOLDER.search(body):
+        problems.append("unfilled placeholder")
     return problems
 
 
@@ -389,7 +482,7 @@ def draft_outreach(trip: TripState, svc: ServiceLine, cand: Candidate) -> Outrea
                          unit=_unit_phrase(svc), vendor_past_quote_anchor=a.anchor_rate, currency=a.currency,
                          cancellation_terms=canc)
             cand_msg = llm.structured_call("outreach", __import__("json").dumps(facts), _Msg)
-            problems = validate_text(cand_msg.body, {a.anchor_rate} if a.anchor_rate else set(), a.floor_rate)
+            problems = validate_text(cand_msg.body, {a.anchor_rate} if a.anchor_rate else set(), a.floor_rate, allowed_text=canc)
             if problems:
                 trip.log("agent:outreach", "outreach", "llm_text_rejected_used_template", vendor_id=cand.vendor_id, problems=problems)
                 by = "template(fallback)"
@@ -404,7 +497,7 @@ def draft_outreach(trip: TripState, svc: ServiceLine, cand: Candidate) -> Outrea
 
 
 def draft_counter(trip: TripState, svc: ServiceLine, vendor_id: str, vname: str, counter: float, quote: Quote,
-                  rnd: int) -> OutreachDraft:
+                  rnd: int, agent_body: str = "") -> OutreachDraft:
     a = svc.anchors[vendor_id]
     cur = quote.currency or a.currency
     ref = (f" Based on your recent quotes to us (around {fmt_money(a.anchor_rate, a.currency)}),"
@@ -415,7 +508,17 @@ def draft_counter(trip: TripState, svc: ServiceLine, vendor_id: str, vname: str,
             f"This proposal is subject to our final confirmation. Could you let us know whether you can accept it?\n\n"
             f"Kind regards,\nMsafara Operations")
     msg, by = _Msg(subject=f"Re: Availability & quote request - {trip.brief.city}", body=body), "template"
-    if not llm.mock_mode():
+    if agent_body.strip():
+        allowed = {counter, quote.unit_rate} | ({a.anchor_rate} if a.anchor_rate else set())
+        problems = validate_text(agent_body, allowed, a.floor_rate)
+        if not any(abs(n - counter) < 0.5 for n in money_mentions(agent_body)):
+            problems.append("counter amount missing from text")
+        if problems:
+            trip.log("guardrail", "counter", "agent_text_rejected_used_template", vendor_id=vendor_id, problems=problems)
+            by = "template(fallback)"
+        else:
+            msg, by = _Msg(subject=msg.subject, body=agent_body), "llm"
+    elif not llm.mock_mode():
         try:
             facts = dict(counter_offer_amount=counter, vendor_quote=quote.unit_rate, vendor_past_quote_anchor=a.anchor_rate,
                          currency=cur, unit=_unit_phrase(svc), vendor=vname, requirement=svc.spec, history=a.history_note)
@@ -506,8 +609,22 @@ def mock_parse_quote(text: str, needed_qty: int, our_counter: Optional[float], c
                        summary="Price given but taxes not stated.")
 
 
+_SUSPICIOUS = re.compile(
+    r"ignore (?:all |any )?(?:previous|prior|above|earlier) instructions|system (?:note|message|prompt|override)|"
+    r"note to the (?:booking )?(?:assistant|ai|agent|bot|system)|pre-?approved|as an ai\b|you are now|disregard (?:your|the)|"
+    r"(?:wire|transfer|send) (?:the )?(?:deposit|advance|payment)|bank account|mark (?:it|this) (?:as )?(?:accepted|approved)|"
+    r"(?:auto-?)?confirm (?:the booking )?(?:immediately|now) without", re.I)
+
+
+def reply_flags(text: Optional[str]) -> list[str]:
+    return ["suspicious_instructions"] if text and _SUSPICIOUS.search(text) else []
+
+
 def rate_grounded(rate: float, text: str) -> bool:
-    nums = currency_numbers(text)
+    """A parsed rate must be traceable to the reply: written there (with or without a currency marker, or as
+    '7.4k'), or derived from a written number plus a stated tax %."""
+    nums = currency_numbers(text) + _plain_numbers(text) + \
+        [to_float(m.group(1)) * 1000 for m in re.finditer(r"(\d+(?:\.\d+)?)\s*k\b", text, re.I)]
     if any(abs(rate - n) < 0.5 for n in nums):
         return True
     pcts = [float(x) for x in re.findall(r"(\d+(?:\.\d+)?)\s*%", text)]
@@ -526,8 +643,10 @@ def parse_quote(trip: TripState, svc: ServiceLine, vendor_id: str, reply: Option
         pq = mock_parse_quote(reply, needed, our_counter, cur)
     else:
         try:
+            earlier = [dict(round=q.round, status=q.status, unit_rate=q.unit_rate, tax_inclusive=q.tax_inclusive)
+                       for q in svc.quote_history if q.vendor_id == vendor_id]
             ctx = dict(reply=reply, quantity_requested=needed, unit=_unit_phrase(svc), currency=cur,
-                       our_counter_offer=our_counter)
+                       our_counter_offer=our_counter, earlier_replies_from_this_vendor=earlier)
             pq = llm.structured_call("parse_quote", __import__("json").dumps(ctx), ParsedQuote)
             if pq.status not in ("quote", "decline", "partial", "ambiguous", "tax_unclear"):
                 raise llm.LLMOutputError(f"unknown status {pq.status}")
@@ -538,6 +657,9 @@ def parse_quote(trip: TripState, svc: ServiceLine, vendor_id: str, reply: Option
         except llm.LLMOutputError as e:
             trip.log("agent:parse", "parse", "llm_failed_mark_ambiguous", vendor_id=vendor_id, error=str(e)[:200])
             pq = ParsedQuote(status="ambiguous", currency=cur, confidence=0.3, summary="Could not parse reply reliably.")
+    if pq.accepts_counter and not (our_counter is not None and pq.unit_rate is not None and abs(pq.unit_rate - our_counter) < 0.5):
+        trip.log("guardrail", "parse", "accepts_counter_cleared", vendor_id=vendor_id, rate=pq.unit_rate, our_counter=our_counter)
+        pq.accepts_counter = False
     firm = False
     if our_counter is not None and not pq.accepts_counter and pq.unit_rate is not None:
         firm = pq.firm or is_firm(reply)       # the regex backs up the LLM; either is enough
@@ -547,9 +669,12 @@ def parse_quote(trip: TripState, svc: ServiceLine, vendor_id: str, reply: Option
             pq = pq.model_copy(update=dict(status="quote", tax_inclusive=True,
                                            summary=pq.summary + " Tax basis carried over from the earlier quote."))
     summary = pq.summary + (" Vendor says this is their best price." if firm else "")
+    flags = reply_flags(reply)
+    if flags:
+        trip.log("guardrail", "parse", "suspicious_instructions_in_reply", vendor_id=vendor_id)
     return Quote(vendor_id=vendor_id, status=pq.status, unit_rate=pq.unit_rate, currency=pq.currency or cur,
                  tax_inclusive=pq.tax_inclusive, available_units=pq.available_units, accepts_counter=pq.accepts_counter,
-                 firm=firm, confidence=pq.confidence, summary=summary, raw_text=reply, round=rnd)
+                 firm=firm, confidence=pq.confidence, summary=summary, raw_text=reply, round=rnd, flags=flags)
 
 
 # =========================================================== NEGOTIATION (pure code)
@@ -568,6 +693,12 @@ def assert_counter_bounds(counter: float, quote: float, floor: float, policy: Po
         raise BoundViolation(f"counter {counter} more than {cap}% below quote {quote}")
     if counter >= quote:
         raise BoundViolation(f"counter {counter} is not below quote {quote}")
+
+
+def counter_matches(svc: ServiceLine, vendor_id: str, rate: Optional[float]) -> bool:
+    """True only if our most recent counter went to this vendor at exactly this rate."""
+    c = svc.counters[-1] if svc.counters else None
+    return bool(c and rate is not None and c.vendor_id == vendor_id and abs(c.counter_rate - rate) < 0.5)
 
 
 def latest_valid_quote(svc: ServiceLine, vendor_id: str) -> Optional[Quote]:
@@ -675,6 +806,14 @@ def decide_service(svc: ServiceLine, policy: Policy):
     svc.escalation, svc.decision = None, None
     thr = policy.confidence_threshold
     last_neg = svc.counters[-1].vendor_id if svc.counters else None
+    sus = sorted({q.vendor_id for q in svc.quote_history if "suspicious_instructions" in q.flags})
+    if sus:
+        svc.decision, svc.status = "escalate", "escalated"
+        svc.escalation = Escalation(reason=f"reply from {', '.join(_cname(svc, v) for v in sus)} contains instructions aimed at "
+                                           f"the system (treated as untrusted)", code="suspicious_instructions",
+                                    options=["accept_quote", "drop_service"])
+        svc.reasoning, svc.confidence = svc.escalation.reason, 0.0
+        return
     # A reply to our counter that is not a usable quote always goes to a human.
     if last_neg:
         q = svc.quotes.get(last_neg)
@@ -684,6 +823,16 @@ def decide_service(svc: ServiceLine, policy: Policy):
             svc.escalation = Escalation(
                 reason=f"reply from {nm} to our counter was {q.status.replace('_', ' ')}: {q.summary}",
                 code=f"counter_reply_{q.status}", options=["accept_quote (previous valid quote)", "counter", "drop_service"])
+            svc.reasoning, svc.confidence = svc.escalation.reason, q.confidence
+            return
+        if q and q.round >= svc.negotiation_round and q.status == "quote" and q.unit_rate and not q.accepts_counter \
+                and q.unit_rate > svc.counters[-1].quote_rate + 0.5:
+            nm = _cname(svc, last_neg)
+            svc.decision, svc.status = "escalate", "escalated"
+            svc.escalation = Escalation(
+                reason=f"{nm} raised the price after our counter ({fmt_money(svc.counters[-1].quote_rate, q.currency)} -> "
+                       f"{fmt_money(q.unit_rate, q.currency)})", code="price_raised_mid_thread",
+                options=["accept_quote", "drop_service"])
             svc.reasoning, svc.confidence = svc.escalation.reason, q.confidence
             return
     valid = {v: q for v, q in svc.quotes.items() if q.status == "quote" and q.unit_rate}
@@ -706,7 +855,7 @@ def decide_service(svc: ServiceLine, policy: Policy):
         svc.reasoning, svc.confidence = svc.escalation.reason, q.confidence
         return
     over_card = ((q.unit_rate - a.rate_card_rate) / a.rate_card_rate * 100) if a.rate_card_rate else 0
-    if q.accepts_counter:
+    if q.accepts_counter and counter_matches(svc, vid, q.unit_rate):
         svc.decision, svc.status, svc.agreed_rate = "accept", "accepted", q.unit_rate
         svc.reasoning = f"{nm} agreed to our counter of {fmt_money(q.unit_rate, cur)} (floor on file respected)."
         svc.confidence = round(q.confidence * 0.95, 2)
@@ -793,3 +942,117 @@ def dispatch_draft(trip: TripState, draft: OutreachDraft, approved_by: str) -> s
     trip.log("system", "send", "message_sent", draft_id=draft.draft_id, vendor_id=draft.vendor_id, service=draft.service_id,
              kind=draft.kind, channel=channel, approved_by=approved_by)
     return channel
+
+
+# =========================================================== LLM AGENTS WITH TOOLS (rules = guardrail + fallback)
+def _llm_on(flag: str) -> bool:
+    return not llm.mock_mode() and os.environ.get(flag, "1") != "0"
+
+
+def source_vendors(trip: TripState, svc: ServiceLine):
+    """Sourcing agent: the model searches the KB with search_vendors and picks 3-5 vendors with select_vendors.
+    Eligibility (city, category, star, capacity, blacklist) is enforced inside the tool; the rules ranking is the fallback."""
+    rules_cands, rules_excluded = match_vendors(svc, trip.brief, trip.policy)
+    if not _llm_on("MSAFARA_LLM_SOURCING") or not rules_cands:
+        return rules_cands, rules_excluded, "rules"
+    import json
+    from . import tools as T
+    ctx = T.SourcingCtx(trip, svc)
+    user = json.dumps(dict(service=svc.category, requirement=svc.spec, group_size=trip.brief.pax,
+                           notes=trip.brief.notes, request_text=trip.request_text[:600]))
+    try:
+        res = llm.run_tool_loop("sourcing", user, T.SOURCING_TOOLS, ctx.execute, max_steps=5)
+        _log_trace(trip, svc, res, None, "sourcing")
+    except llm.LLMOutputError as e:
+        _log_trace(trip, svc, getattr(e, "partial", None), None, "sourcing")
+        trip.log("agent:sourcing", "match", "llm_failed_fallback_to_rules", service=svc.service_id, error=str(e)[:200])
+        return rules_cands, rules_excluded, "rules(fallback)"
+    score = {c.vendor_id: c.score for c in rules_cands}
+    cands = [Candidate(vendor_id=v, name=ctx.seen[v]["name"], score=score.get(v, ctx.seen[v]["reliability"]),
+                       why=f"chosen by sourcing agent: {ctx.reason}"[:200], preferred=ctx.seen[v]["preferred"])
+             for v in ctx.selected]
+    excluded = list({e["vendor_id"]: e for e in rules_excluded + ctx.excluded}.values())
+    return cands, excluded, "llm"
+
+
+def _log_trace(trip, svc, res, rules_view, agent):
+    if res is None:
+        return
+    extra = {}
+    if rules_view is not None:
+        extra["rules_would"] = dict(decision=rules_view.decision, code=rules_view.escalation.code if rules_view.escalation else None)
+    trip.log(f"agent:{agent}", "decide" if agent == "negotiation" else "match", "tool_trace", service=svc.service_id,
+             steps=res.steps, refused=res.refused, decided=res.terminal is not None,
+             calls=[dict(tool=t["tool"], args={k: v for k, v in t["args"].items() if k != "message"},
+                         ok=t["result"].get("ok", True), error=t["result"].get("error")) for t in res.trace], **extra)
+
+
+def _negotiation_brief(trip: TripState, svc: ServiceLine) -> str:
+    import json
+    vendors = []
+    for c in svc.candidates:
+        q = svc.quotes.get(c.vendor_id)
+        vendors.append(dict(vendor_id=c.vendor_id, name=c.name, reliability_score=c.score,
+                            latest_status=q.status if q else "not contacted",
+                            latest_rate=q.unit_rate if q else None, currency=svc.anchors[c.vendor_id].currency))
+    p = trip.policy
+    last = None
+    if svc.counters:
+        c = svc.counters[-1]
+        rq = svc.quotes.get(c.vendor_id)
+        last = dict(vendor_id=c.vendor_id, our_counter=c.counter_rate, their_quote_before=c.quote_rate,
+                    their_reply_status=rq.status if rq else None, their_reply_rate=rq.unit_rate if rq else None,
+                    they_accepted=bool(rq and rq.accepts_counter))
+    return json.dumps(dict(service=svc.service_id, requirement=svc.spec, units=svc.units, unit_label=svc.unit_label,
+                           rounds_used=svc.negotiation_round, rounds_cap=p.rounds_cap, our_last_counter=last,
+                           max_discount_pct=min(p.max_discount_pct, HARD_MAX_DISCOUNT_PCT),
+                           over_anchor_tolerance_pct=p.over_anchor_tolerance_pct, vendors=vendors))
+
+
+def decide_service_llm(trip: TripState, svc: ServiceLine):
+    """Negotiation agent: reads the thread through tools and decides accept / counter (amount + message) / escalate.
+
+    The rules engine runs first on a copy. Its verdict is never shown to the model; it is used as the guardrail
+    (a must-escalate verdict restricts the model to escalate_to_human) and as the fallback when the model fails.
+    """
+    rules_view = svc.model_copy(deep=True)
+    decide_service(rules_view, trip.policy)
+    if not _llm_on("MSAFARA_LLM_NEGOTIATION"):
+        decide_service(svc, trip.policy)
+        svc.decided_by = "rules"
+        return
+    from . import tools as T
+    ctx = T.NegotiationCtx(trip, svc, rules_view)
+    try:
+        res = llm.run_tool_loop("negotiate", _negotiation_brief(trip, svc), T.NEGOTIATION_TOOLS, ctx.execute, max_steps=8)
+    except llm.LLMOutputError as e:
+        _log_trace(trip, svc, getattr(e, "partial", None), rules_view, "negotiation")
+        trip.log("agent:negotiation", "decide", "llm_failed_fallback_to_rules", service=svc.service_id, error=str(e)[:200])
+        decide_service(svc, trip.policy)
+        svc.decided_by = "rules(fallback)"
+        return
+    d = ctx.decision
+    svc.escalation, svc.decision, svc.llm_counter_rate, svc.llm_counter_body = None, None, None, ""
+    svc.decided_by = "llm"
+    _log_trace(trip, svc, res, rules_view, "negotiation")
+    if d["action"] == "escalate":
+        base = rules_view.escalation if (rules_view.decision == "escalate" and rules_view.escalation) else None
+        svc.decision, svc.status = "escalate", "escalated"
+        svc.escalation = Escalation(reason=d["reason"] or (base.reason if base else "agent escalated"),
+                                    code=base.code if base else f"agent_{d['code']}",
+                                    options=base.options if base else ["accept_quote", "counter", "drop_service"])
+        svc.reasoning, svc.confidence = "Escalated: " + svc.escalation.reason, 0.0
+        return
+    vid = d["vendor_id"]
+    q = latest_valid_quote(svc, vid)
+    svc.selected_vendor_id = vid
+    if d["action"] == "accept":
+        svc.decision, svc.status, svc.agreed_rate = "accept", "accepted", q.unit_rate
+        svc.reasoning = f"Agent accepted {_cname(svc, vid)} at {fmt_money(q.unit_rate, q.currency)}: {d['reason']}"
+        svc.confidence = round(q.confidence * 0.95, 2)
+        return
+    svc.decision, svc.status = "counter", "negotiating"
+    svc.llm_counter_rate, svc.llm_counter_body = d["rate"], d.get("message", "")
+    svc.reasoning = (f"Agent counter round {svc.negotiation_round + 1} to {_cname(svc, vid)} at "
+                     f"{fmt_money(d['rate'], q.currency)} (quote {fmt_money(q.unit_rate, q.currency)}): {d['reason']}")
+    svc.confidence = round(q.confidence * 0.85, 2)
