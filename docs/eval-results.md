@@ -23,8 +23,8 @@ Same 100 synthetic trips, same simulated vendors, same checks. The only differen
 | Wall time per trip | 0.5 s | 73.6 s |
 
 **Runs**
-- Rules engine: 2026-10-20, 100 trips, model: none (rules engine), prompts counter v1, intake v3, judge v1, negotiate v1, outreach v2, parse_quote v2, sourcing v1, commit `054f3b2`
-- LLM agents: 2026-10-20, 100 trips, model: small hosted LLM, prompts counter v1, intake v3, judge v1, negotiate v1, outreach v2, parse_quote v2, sourcing v1, commit `1892bb5`
+- Rules engine: 2026-10-20, 100 trips, model: none (rules engine), prompts counter v1, intake v3, judge v1, negotiate v1, outreach v2, parse_quote v2, sourcing v1, commit `45f4192`
+- LLM agents: 2026-10-20, 100 trips, model: small hosted LLM, prompts counter v1, intake v3, judge v1, negotiate v1, outreach v2, parse_quote v2, sourcing v1, commit `c7497b0`
 
 **On the LLM run**
 - Service decisions made by the negotiation agent: 264; handed to the rules fallback after a model failure: 0.
