@@ -123,13 +123,13 @@ def match(s):
     t.status = "matching"
     t.services = A.build_services(t.brief)
     for svc in t.services:
-        cands, excluded = A.match_vendors(svc, t.brief, t.policy)
+        cands, excluded, by = A.source_vendors(t, svc)
         svc.candidates = cands
         svc.anchors = {c.vendor_id: A.anchor_for(c.vendor_id) for c in cands}
         t.log("agent:matching", "match", "vendors_matched", service=svc.service_id,
               candidates=[dict(vendor_id=c.vendor_id, name=c.name, score=c.score, why=c.why) for c in cands],
-              excluded=excluded,
-              reasoning=f"{len(cands)} candidate(s) for {svc.service_id} via RAG filter + rank "
+              excluded=excluded, chosen_by=by,
+              reasoning=f"{len(cands)} candidate(s) for {svc.service_id} via {'sourcing agent (search_vendors tool)' if by == 'llm' else 'RAG filter + rank'} "
                         f"({len(excluded)} excluded: {', '.join(e['reason'] for e in excluded) or 'none'}).")
         if not cands:
             svc.status, svc.decision = "escalated", "escalate"
@@ -179,6 +179,7 @@ def _apply_draft_gate(t: TripState, d: dict, kinds: tuple, node: str):
             probs = A.validate_edit(x, t.svc(x.service_id), t.policy, body)
             if probs:
                 t.log("human", node, "edit_refused", draft_id=did, problems=probs)
+                rejected_ids.add(did)          # never fall back to sending the unedited text
                 continue
             x.body, x.subject, x.edited = body, subj, True
             t.log("human", node, "draft_edited", draft_id=did, vendor_id=x.vendor_id)
@@ -278,9 +279,9 @@ def decide(s):
     for svc in t.services:
         if svc.status in ("dropped", "accepted", "confirmed", "planned") or (svc.status == "escalated" and svc.escalation and svc.escalation.code == "no_vendors"):
             continue
-        decide_before = svc.status
-        A.decide_service(svc, t.policy)
+        A.decide_service_llm(t, svc)
         t.log("agent:negotiation", "decide", f"decision_{svc.decision}", service=svc.service_id, reasoning=svc.reasoning,
+              decided_by=svc.decided_by,
               confidence=svc.confidence, label=A.conf_label(svc.confidence),
               escalation=svc.escalation.model_dump() if svc.escalation else None)
         if svc.decision == "escalate":
@@ -357,9 +358,14 @@ def counter(s):
         q = A.latest_valid_quote(svc, vid)
         a = svc.anchors[vid]
         operator_set = svc.operator_counter_rate is not None
+        agent_set = (not operator_set) and svc.llm_counter_rate is not None
         try:
-            c = svc.operator_counter_rate if operator_set else A.compute_counter(
-                q.unit_rate, a.floor_rate, t.policy.discount_for_round(svc.negotiation_round))
+            if operator_set:
+                c = svc.operator_counter_rate
+            elif agent_set:
+                c = svc.llm_counter_rate
+            else:
+                c = A.compute_counter(q.unit_rate, a.floor_rate, t.policy.discount_for_round(svc.negotiation_round))
             A.assert_counter_bounds(c, q.unit_rate, a.floor_rate, t.policy, svc.negotiation_round)
         except BoundViolation as e:
             svc.status, svc.decision = "escalated", "escalate"
@@ -367,12 +373,14 @@ def counter(s):
                                         options=["accept_quote", "drop_service"])
             svc.reasoning = svc.escalation.reason
             t.log("agent:negotiation", "counter", "guardrail_blocked", service=svc.service_id, error=str(e))
+            t.log("agent:escalation", "counter", "escalated_to_human", service=svc.service_id, reason=svc.escalation.reason)
             continue
-        svc.operator_counter_rate = None
+        body = svc.llm_counter_body if agent_set else ""
+        svc.operator_counter_rate, svc.llm_counter_rate, svc.llm_counter_body = None, None, ""
         disc = round((q.unit_rate - c) / q.unit_rate * 100, 2)
         svc.counters.append(CounterRecord(round=svc.negotiation_round, vendor_id=vid, quote_rate=q.unit_rate,
                                           discount_pct=disc, counter_rate=c, floor_rate=a.floor_rate, operator_set=operator_set))
-        t.drafts.append(A.draft_counter(t, svc, vid, _vname(vid), c, q, svc.negotiation_round))
+        t.drafts.append(A.draft_counter(t, svc, vid, _vname(vid), c, q, svc.negotiation_round, agent_body=body))
         t.log("agent:negotiation", "counter", "counter_drafted", service=svc.service_id, vendor_id=vid, round=svc.negotiation_round + 1,
               quote=q.unit_rate, counter=c, discount_pct=disc, reasoning=svc.reasoning)
         n += 1

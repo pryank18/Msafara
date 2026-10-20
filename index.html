@@ -227,6 +227,28 @@
     .row-fields { flex-direction: column; gap: 0; }
     .modal { width: 92vw; padding: 20px; }
   }
+
+  /* Agent evals panel */
+  #panel-evals { max-width: 980px; }
+  #panel-evals .ev-kpis .stat-card .label b { color: var(--text); font-weight: 600; }
+  .ev-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; margin: 8px 0 26px; background: var(--surface); }
+  .ev-table-wrap table { min-width: 560px; }
+  .ev-table-wrap td.ev-better { color: var(--success); font-weight: 600; }
+  .ev-table-wrap td.ev-worse { color: var(--danger); }
+  .ev-table-wrap tr.ev-sub td:first-child { padding-left: 26px; color: var(--text-muted); }
+  .ev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 8px 0 26px; }
+  .ev-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; }
+  .ev-box h3 { margin: 0 0 8px; font-size: 14px; }
+  .ev-box ul { margin: 0; padding-left: 18px; color: var(--text-muted); font-size: 13.5px; line-height: 1.55; }
+  .ev-box code, #panel-evals code { background: var(--surface-raised); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; color: var(--accent-soft); }
+  .ev-note { color: var(--text-muted); font-size: 13px; line-height: 1.6; max-width: 760px; }
+  .ev-links a { color: var(--accent); }
+  @media (max-width: 640px) {
+    .ev-table-wrap table { min-width: 0; table-layout: fixed; font-size: 12.5px; }
+    .ev-table-wrap th, .ev-table-wrap td { padding: 8px 7px; word-break: break-word; }
+    .ev-table-wrap th:first-child, .ev-table-wrap td:first-child { width: 46%; }
+    .ev-table-wrap tr.ev-sub td:first-child { padding-left: 14px; }
+  }
 </style>
 </head>
 <body dir="ltr">
@@ -234,6 +256,7 @@
   <div class="brand">Vendor <span>Control</span></div>
   <div class="tagline" data-i18n="tagline">Automated vendor coordination for tour operators.</div>
   <button class="nav-btn active" data-panel="queue" data-i18n="nav_queue">Queue</button>
+  <button class="nav-btn" data-panel="evals" data-i18n="nav_evals">Agent Evals</button>
   <button class="nav-btn" data-panel="new" data-i18n="nav_new">New Request</button>
   <button class="nav-btn" data-panel="sourcing" data-i18n="nav_sourcing">New Sourcing</button>
   <button class="nav-btn" data-panel="compare" data-i18n="nav_compare">Compare Sourcing</button>
@@ -387,6 +410,47 @@
       </div>
     </div>
   </div>
+  <div class="panel" id="panel-evals" dir="ltr">
+<!-- EVALS:START -->
+    <h1>LLM agents vs the rules engine</h1>
+    <p class="subtitle">100 synthetic trips: 25 core plus 75 written to break things. Same simulated vendors, same checks, same judge for both columns.
+    The agents read and decide; code enforces the limits and a person approves every message.</p>
+    <div class="stats-strip ev-kpis"><div class="stat-card accent-success"><div class="num">100%</div><div class="label">task completion<br>rules engine: <b>86.0%</b></div></div><div class="stat-card accent-success"><div class="num">0</div><div class="label">price-limit violations<br>rules engine: <b>4</b></div></div><div class="stat-card accent-info"><div class="num">0</div><div class="label">sends without approval<br>of 1,183 messages</div></div><div class="stat-card accent-success"><div class="num">1.00</div><div class="label">escalation recall<br>rules engine: <b>0.90</b></div></div><div class="stat-card accent-warn"><div class="num">$0.012</div><div class="label">model cost per trip<br>74 s, 32.7 calls</div></div></div>
+    <div class="ev-table-wrap"><table>
+      <thead><tr><th>Metric</th><th>Rules engine</th><th>LLM agents + rules guardrails</th></tr></thead>
+      <tbody><tr><td>Task completion (right end state, no breach)</td><td class="ev-worse">86.0%</td><td class="ev-better">100%</td></tr><tr class="ev-sub"><td>core 25 trips</td><td class="">100%</td><td class="">100%</td></tr><tr class="ev-sub"><td>75 messy / adversarial trips</td><td class="ev-worse">81.3%</td><td class="ev-better">100%</td></tr><tr><td>Intake field accuracy</td><td class="ev-worse">97.4%</td><td class="ev-better">99.9%</td></tr><tr><td>Intake exact (all 8 fields right)</td><td class="ev-worse">90.0%</td><td class="ev-better">99.0%</td></tr><tr><td>Intake, 12 held-out phrasings (field accuracy)</td><td class="ev-worse">91.7%</td><td class="ev-better">100%</td></tr><tr><td>Price-limit violations</td><td class="ev-worse">4</td><td class="ev-better">0</td></tr><tr><td>Sends without approval (must be 0)</td><td class="">0 of 1,168</td><td class="">0 of 1,183</td></tr><tr><td>Escalation precision / recall (trip)</td><td class="ev-worse">0.87 / 0.90</td><td class="ev-better">1.00 / 1.00</td></tr><tr><td>Escalation precision / recall (service)</td><td class="ev-worse">0.93 / 0.91</td><td class="ev-better">1.00 / 1.00</td></tr><tr><td>Vendor-reply parse accuracy</td><td class="ev-worse">98.0%</td><td class="ev-better">99.9%</td></tr><tr><td>Outbound message quality (same model judge, both columns)</td><td class="ev-worse">27.2%</td><td class="ev-better">76.8%</td></tr><tr><td>Model calls per trip</td><td class="">0</td><td class="">32.7</td></tr><tr><td>Tokens per trip (in / out)</td><td class="">0 / 0</td><td class="">52,585 / 12,890</td></tr><tr><td>Cost per trip</td><td class="">$0</td><td class="">$0.0117</td></tr><tr><td>Wall time per trip</td><td class="">0.5 s</td><td class="">73.6 s</td></tr></tbody>
+    </table></div>
+    <div class="ev-grid">
+      <div class="ev-box"><h3>How the agents decide</h3><ul>
+        <li><b>Intake</b> turns a messy request into a brief; every value must appear in the text.</li>
+        <li><b>Sourcing</b> calls <code>search_vendors</code> and picks 3-5 eligible vendors.</li>
+        <li><b>Reply reading</b> extracts status, tax-inclusive rate and availability, with the thread so far.</li>
+        <li><b>Negotiation</b> calls <code>check_vendor_status</code>, <code>get_price_limits</code>, then <code>propose_counter</code>, <code>accept_quote</code> or <code>escalate_to_human</code>.</li>
+      </ul></div>
+      <div class="ev-box"><h3>What the code still enforces</h3><ul>
+        <li>Counters stay within 10% of the quote, above the floor, max 2 rounds; the tool refuses anything else.</li>
+        <li>No automatic accept above the past-quote anchor + 10%.</li>
+        <li>Unclear, partial, silent or suspicious replies can only be escalated.</li>
+        <li>No tool can send: every message waits at a human approval gate.</li>
+      </ul></div>
+      <div class="ev-box"><h3>What the 75 new trips throw at it</h3><ul>
+        <li>Typos, chat-style and forwarded requests; a correction after the first ask.</li>
+        <li>Requests that must not run: "next month", two cities, two group sizes, no year.</li>
+        <li>Vendors who raise the price after a counter, withdraw rooms, or say "agreed" then add tax.</li>
+        <li>Instructions to the system hidden in replies, a deposit request to a new bank account, prices like "7.4k".</li>
+      </ul></div>
+    </div>
+    <p class="ev-note"><b>Read these correctly.</b> Vendors are a deterministic simulator and the dataset, simulator and agents share an author;
+    the approver in the eval is scripted. This shows the system behaves as designed on hard synthetic cases, not that it works on real vendor email.
+    One run per system (2026-10-20, model class: small hosted LLM, commit <code>a617bab</code>).
+    The rules engine was tuned on the core 25 and has not seen the extended set; that is the point of the comparison.
+    The guardrails were reviewed independently before the final run, and the holes found were fixed and are covered by tests.</p>
+    <p class="ev-note ev-links">Full method, every remaining miss and how to reproduce:
+    <a href="https://github.com/pryank18/Msafara/blob/main/docs/eval-results.md" target="_blank" rel="noopener">eval write-up</a> ·
+    <a href="https://github.com/pryank18/Msafara/tree/main/msafara" target="_blank" rel="noopener">agent code</a> ·
+    <a href="https://github.com/pryank18/Msafara/blob/main/msafara/tools.py" target="_blank" rel="noopener">tools and limits</a></p>
+<!-- EVALS:END -->
+  </div>
   <div class="panel" id="panel-status">
     <h1 data-i18n="status_title">System status</h1>
     <p class="subtitle" data-i18n="status_subtitle">What's actually wired up versus running in mock mode.</p>
@@ -407,7 +471,7 @@ const I18N = {
   en: {
     tagline: "Automated vendor coordination for tour operators.",
     nav_queue: "Queue", nav_new: "New Request", nav_sourcing: "New Sourcing",
-    nav_compare: "Compare Sourcing", nav_vendors: "Vendor Directory", nav_proposal: "Generate Proposal", nav_how: "How It Works", nav_status: "System Status",
+    nav_compare: "Compare Sourcing", nav_vendors: "Vendor Directory", nav_proposal: "Generate Proposal", nav_how: "How It Works", nav_status: "System Status", nav_evals: "Agent Evals",
     lang_label: "Language",
     queue_title: "Open requests", queue_subtitle: "Every vendor request, current status, last updated.",
     queue_empty: "No requests yet — create one under New Request.",
@@ -465,7 +529,7 @@ const I18N = {
   ar: {
     tagline: "تنسيق تلقائي مع الموردين لمشغلي الرحلات السياحية.",
     nav_queue: "قائمة الطلبات", nav_new: "طلب جديد", nav_sourcing: "توريد جديد",
-    nav_compare: "مقارنة التوريد", nav_vendors: "دليل الموردين", nav_proposal: "إنشاء عرض", nav_how: "كيف يعمل النظام", nav_status: "حالة النظام",
+    nav_compare: "مقارنة التوريد", nav_vendors: "دليل الموردين", nav_proposal: "إنشاء عرض", nav_how: "كيف يعمل النظام", nav_status: "حالة النظام", nav_evals: "تقييم الوكلاء",
     lang_label: "اللغة",
     queue_title: "الطلبات المفتوحة", queue_subtitle: "كل طلب مورد، حالته الحالية، وآخر تحديث له.",
     queue_empty: "لا توجد طلبات بعد — أنشئ واحدًا من قسم طلب جديد.",
@@ -523,7 +587,7 @@ const I18N = {
   fr: {
     tagline: "Coordination automatisée des fournisseurs pour voyagistes.",
     nav_queue: "File d'attente", nav_new: "Nouvelle demande", nav_sourcing: "Nouveau sourcing",
-    nav_compare: "Comparer le sourcing", nav_vendors: "Répertoire fournisseurs", nav_proposal: "Générer une proposition", nav_how: "Fonctionnement", nav_status: "État du système",
+    nav_compare: "Comparer le sourcing", nav_vendors: "Répertoire fournisseurs", nav_proposal: "Générer une proposition", nav_how: "Fonctionnement", nav_status: "État du système", nav_evals: "Évaluation des agents",
     lang_label: "Langue",
     queue_title: "Demandes ouvertes", queue_subtitle: "Chaque demande fournisseur, son statut actuel, sa dernière mise à jour.",
     queue_empty: "Aucune demande pour l'instant — créez-en une sous Nouvelle demande.",
@@ -581,7 +645,7 @@ const I18N = {
   sw: {
     tagline: "Uratibu wa kiotomatiki wa wauzaji kwa waendeshaji watalii.",
     nav_queue: "Foleni", nav_new: "Ombi Jipya", nav_sourcing: "Utafutaji Mpya",
-    nav_compare: "Linganisha Utafutaji", nav_vendors: "Orodha ya Wauzaji", nav_proposal: "Tengeneza Pendekezo", nav_how: "Jinsi Inavyofanya Kazi", nav_status: "Hali ya Mfumo",
+    nav_compare: "Linganisha Utafutaji", nav_vendors: "Orodha ya Wauzaji", nav_proposal: "Tengeneza Pendekezo", nav_how: "Jinsi Inavyofanya Kazi", nav_status: "Hali ya Mfumo", nav_evals: "Tathmini ya Mawakala",
     lang_label: "Lugha",
     queue_title: "Maombi yaliyo wazi", queue_subtitle: "Kila ombi la muuzaji, hali yake ya sasa, na sasisho la mwisho.",
     queue_empty: "Hakuna maombi bado — tengeneza moja chini ya Ombi Jipya.",
@@ -639,7 +703,7 @@ const I18N = {
   hi: {
     tagline: "टूर ऑपरेटरों के लिए स्वचालित वेंडर समन्वय।",
     nav_queue: "कतार", nav_new: "नया अनुरोध", nav_sourcing: "नई सोर्सिंग",
-    nav_compare: "सोर्सिंग तुलना करें", nav_vendors: "वेंडर निर्देशिका", nav_proposal: "प्रस्ताव तैयार करें", nav_how: "यह कैसे काम करता है", nav_status: "सिस्टम स्थिति",
+    nav_compare: "सोर्सिंग तुलना करें", nav_vendors: "वेंडर निर्देशिका", nav_proposal: "प्रस्ताव तैयार करें", nav_how: "यह कैसे काम करता है", nav_status: "सिस्टम स्थिति", nav_evals: "एजेंट मूल्यांकन",
     lang_label: "भाषा",
     queue_title: "खुले अनुरोध", queue_subtitle: "हर वेंडर अनुरोध, उसकी वर्तमान स्थिति, अंतिम अपडेट।",
     queue_empty: "अभी तक कोई अनुरोध नहीं — नया अनुरोध सेक्शन में एक बनाएं।",
@@ -751,8 +815,10 @@ document.querySelectorAll(".nav-btn").forEach(btn => {
     if (btn.dataset.panel === "status") loadStatus();
     if (btn.dataset.panel === "vendors") loadVendors();
     if (btn.dataset.panel === "proposal") loadProposalChecklist();
+    try { history.replaceState(null, "", btn.dataset.panel === "evals" ? "#evals" : location.pathname + location.search); } catch (e) {}
   });
 });
+if (location.hash === "#evals") { const b = document.querySelector('.nav-btn[data-panel="evals"]'); if (b) b.click(); }
 function statusPill(status) {
   return `<span class="pill pill-${status}">${status.replace(/_/g, " ")}</span>`;
 }

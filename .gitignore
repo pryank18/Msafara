@@ -1,2 +1,4 @@
 __pycache__/
 *.pyc
+msafara/evals/runs.local.jsonl
+*.env

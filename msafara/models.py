@@ -78,6 +78,7 @@ class Quote(BaseModel):
     summary: str = ""
     raw_text: str = ""
     round: int = 0
+    flags: list[str] = Field(default_factory=list)   # e.g. suspicious_instructions
 
 
 class OutreachDraft(BaseModel):
@@ -133,6 +134,9 @@ class ServiceLine(BaseModel):
     confidence: Optional[float] = None
     escalation: Optional[Escalation] = None
     operator_counter_rate: Optional[float] = None
+    decided_by: str = "rules"                  # rules | llm | rules(fallback)
+    llm_counter_rate: Optional[float] = None   # counter amount chosen by the negotiation agent (bounds re-checked)
+    llm_counter_body: str = ""
 
 
 class AuditEvent(BaseModel):
