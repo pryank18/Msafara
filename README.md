@@ -171,8 +171,8 @@ The full FastAPI server, Trip Desk page and seeded demo database are not publish
 - Compares competing vendors, ranked by price
 - Handles multi-item replies and escalates partial or ambiguous ones
 - Reopens a confirmed request for revision
-- Generates client-facing proposal documents (.docx)
-- Email (SMTP/IMAP) and WhatsApp (Twilio) dispatch, both optional
+- Generates a client proposal from confirmed requests as a Word-compatible document (in the browser demo)
+- Email dispatch (SMTP) and inbox polling (IMAP), both optional. WhatsApp is recorded as a vendor's channel; sending by WhatsApp is not built yet
 - Dashboard in English, Arabic (full RTL), French, Swahili and Hindi
 
 ## Configuration
@@ -199,7 +199,8 @@ Built by Pryank Wadhera. Product scope, requirements (see `docs/`) and QA are mi
 - The embedder is lexical, and the knowledge base is synthetic.
 - Currency is cosmetic in the earlier dashboard: it shows `$` whatever the stored currency.
 - Vendor replies are simulated in the evals. No real vendor has been contacted.
-- WhatsApp replies need a webhook receiver (not included); outbound only for now.
+- WhatsApp sending and receiving are not built yet.
+- The older root-level `graph.py` imports `state.py` and `llm_nodes.py`, which are not in this repository, so it does not run on its own. The maintained workflow is `msafara/`.
 - One eval run per system; small run-to-run differences on the model side are expected.
 - The approval gate and the limits cover the `msafara/` trip workflow. The older request-tracking flow at the repo root (`graph.py`, `dispatch.py`) sends without that gate.
 - Intake grounding proves a value appears in the request, not that it was read correctly.
